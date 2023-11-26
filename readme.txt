@@ -6,16 +6,15 @@ License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Tags: spam, spammer, autospam, spamblock, antispam, anti-spam, protect, comments, ping, trackback, bot, robot, human, captcha, invisible
 
-Light and invisible method to block auto-spam when spam comment is posted. Pings and trackbacks cheks for real backlinks.
+A lightweight and discreet solution to prevent automatic spam when a spam comment is posted. Additionally, it conducts checks on pings and trackbacks to verify genuine backlinks.
 
 
 
 == Description ==
 
-Block auto-spam when spam comment is posted. Absolutely invisible for users -- There is no any captcha code. Pings and trackbacks cheks for real backlink.
+Effectively prevent automatic spam when a spam comment is posted with Kama Spamblock, a plugin that operates discreetly and remains completely invisible to users—no captcha codes required. The plugin not only blocks spam comments but also conducts thorough checks on pings and trackbacks to ensure the authenticity of backlinks.
 
-Install Kama Spamblock also useful even if you have external comment system like "Disqus". Because autospam could posted directly to "wp-comments-post.php" file. The plugin will protect such comments.
-
+Even if you are using an external comment system like Disqus, installing Kama Spamblock remains valuable. This is because autospam can be posted directly to the 'wp-comments-post.php' file, and the plugin serves as a robust defense against such comments.
 
 
 
@@ -29,14 +28,17 @@ Install Kama Spamblock also useful even if you have external comment system like
 
 == Frequently Asked Questions ==
 
-= On comment post i see message "Antispam block your comment!" is it normal plugin work? =
+= When posting a comment on the site, I received a message, 'Antispam blocked your comment!'. Is this a normal function of the plugin? =
 
-NO! Plugin invisible for users. You need to go to WordPress "Discussion" setting page. At the bottom you will see "Kama Spamblock settings". Set there correct ID attribute of comment form submit button. This attribute you can get from "souse code" of you site page where comment form is. Look for: type="submit" id="-----"
+No! The plugin is invisible to users. You should navigate to the 'Discussion' settings page in WordPress. At the bottom, you'll find 'Kama Spamblock settings.' Set the correct ID attribute for the comment form submit button there. You can obtain this attribute from the 'source code' of your site's page where the comment form is located. Look for: `type="submit" id="??????"`.
 
 
 
 
 == Changelog ==
+
+= 1.8.2 =
+* Minor refactoring.
 
 = 1.8.1 =
 * Code refactoring.
