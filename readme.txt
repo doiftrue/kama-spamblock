@@ -1,12 +1,12 @@
 === Plugin Name ===
 Stable tag: trunk
 Contributors: Tkama
-Tested up to: 6.4.1
+Tested up to: 6.6.2
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Tags: spam, spammer, autospam, spamblock, antispam, anti-spam, protect, comments, ping, trackback, bot, robot, human, captcha, invisible
 
-A lightweight and discreet solution to prevent automatic spam when a spam comment is posted. Additionally, it conducts checks on pings and trackbacks to verify genuine backlinks.
+Light and invisible method to block auto-spam when a spam comment is posted. Pings and trackbacks check for real backlinks.
 
 
 
@@ -20,9 +20,9 @@ Even if you are using an external comment system like Disqus, installing Kama Sp
 
 == Screenshots ==
 
-1. Plugin settings on standart WordPress <code>Settings > Discussion</code> page.
+1. Plugin settings on standard WordPress <code>Settings > Discussion</code> page.
 
-2. Spam alert, when spam comment detected or if user have javascript disabled in his browser. This alert allows send comment once again, when it was blocked in any nonstandard cases.
+2. Spam alert, when spam comment is detected or if the user has JavaScript disabled in their browser. This alert allows sending the comment once again when it was blocked in any nonstandard cases.
 
 
 
@@ -34,8 +34,11 @@ No! The plugin is invisible to users. You should navigate to the 'Discussion' se
 
 
 
-
 == Changelog ==
+
+= 1.8.3 =
+* FIX: XSS vulnerability fixed. Thanks to [Wordfence](https://www.wordfence.com/) for the report.
+* IMP: Other minor improvements.
 
 = 1.8.2 =
 * Minor refactoring.
@@ -48,19 +51,18 @@ No! The plugin is invisible to users. You should navigate to the 'Discussion' se
 * FIX: WordPress 5.5 support.
 
 = 1.7.5 =
-* FIX: bug with uniq code comparation
-* minor code fixes
-
+* FIX: bug with unique code comparison.
+* Minor code fixes.
 
 = 1.7.4 =
-* CHG: change sanitize-options-on-save function - sanitize_key() to sanitize_html_class() - it's not so hard but hard enough...
-* CHG: 'sanitize_setting' function call. Seems it hasn't have back-compat for wordpress versions less then 4.7
+* CHG: changed sanitize-options-on-save function - sanitize_key() to sanitize_html_class() - it's not so hard but hard enough...
+* CHG: 'sanitize_setting' function call. Seems it doesn't have back-compat for WordPress versions less than 4.7.
 
 = 1.7.3 =
-* FIX: options fix of 1.7.2
+* FIX: options fix of 1.7.2.
 
 = 1.7.2 =
-* CHG: move translation to translation.wordpress.org
+* CHG: moved translation to translation.wordpress.org.
 * ADD: new 'unique code' option.
 * IMP: some code improvements.
 
@@ -68,13 +70,13 @@ No! The plugin is invisible to users. You should navigate to the 'Discussion' se
 * BUG: Last UP bug fix...
 
 = 1.6.0 =
-* CHG: check logic is little change in order to correctly work with page cache plugins
+* CHG: check logic is slightly changed in order to work correctly with page cache plugins.
 
 = 1.5.2 =
-* ADD: delete is_singular check for themes where this check work wrong. Now plugin JS showen in all pages
+* ADD: deleted is_singular check for themes where this check works incorrectly. Now plugin JS is shown on all pages.
 
 = 1.5.1 =
-* ADD: js include from numbers of hooks. If there is no "wp_footer" hook in theme
+* ADD: JS included from a number of hooks if there is no "wp_footer" hook in the theme.
 
 = 1.5.0 =
-* ADD: Russian localization
+* ADD: Russian localization.

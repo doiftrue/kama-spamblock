@@ -21,21 +21,16 @@ class Kama_Spamblock {
 	 */
 	private $process_comment_types = [ '', 'comment' ];
 
-	/**
-	 * @param string $plug_file
-	 */
-	public function __construct( $plug_file ) {
-
-		$this->opt = new Kama_Spamblock_Options();
+	public function __construct( string $plug_file, Kama_Spamblock_Options $opt ) {
+		$this->opt = $opt;
 
 		$this->plug_file = $plug_file;
-		$this->plug_dir = dirname( $plug_file );
+		$this->plug_dir  = dirname( $plug_file );
 
 		$this->process_comment_types = apply_filters( 'kama_spamblock__process_comment_types', $this->process_comment_types );
 	}
 
 	public function init_plugin() {
-
 		if( ! defined( 'DOING_AJAX' ) ){
 			load_plugin_textdomain( 'kama-spamblock', false, basename( $this->plug_dir ) . '/languages' );
 		}
@@ -56,22 +51,18 @@ class Kama_Spamblock {
 		}
 
 		if( ! wp_doing_ajax() && ! is_admin() ){
-			add_action( 'wp_footer', [ $this, 'main_js' ], 99 );
+			add_action( 'wp_footer', [ $this, 'main_js' ], 0 );
 		}
 
-		$this->nonce = self::make_nonce( date( 'jn' ) . $this->opt->unique_code );
+		$this->nonce = self::make_hash( date( 'jn' ) . $this->opt->unique_code );
 
 		add_filter( 'preprocess_comment', [ $this, 'block_spam' ], 0 );
 	}
 
 	/**
 	 * Check and block comment if needed.
-	 *
-	 * @param array $commentdata
-	 *
-	 * @return array
 	 */
-	public function block_spam( $commentdata ) {
+	public function block_spam( array $commentdata ): array {
 
 		$this->block_pings_trackbacks( $commentdata );
 		$this->block_regular_comment( $commentdata );
@@ -101,21 +92,18 @@ class Kama_Spamblock {
 			return;
 		}
 
-		$ksbn_code = isset( $_POST['ksbn_code'] ) ? trim( $_POST['ksbn_code'] ) : '';
+		$ksbn_code = trim( $_POST['ksbn_code'] ?? '' );
 
-		if( self::make_nonce( $ksbn_code ) !== $this->nonce ){
+		if( self::make_hash( $ksbn_code ) !== $this->nonce ){
 			/** @noinspection ForgottenDebugOutputInspection */
 			wp_die( $this->block_form() );
 		}
 	}
 
 	/**
-	 * @param string $key
-	 *
-	 * @return string
+	 * Creates hash from specified key if it's not hashed yet.
 	 */
-	private static function make_nonce( $key ) {
-		// maybe already md5
+	private static function make_hash( string $key ): string {
 		return preg_match( '/^[a-f0-9]{32}$/', $key ) ? $key : md5( $key );
 	}
 
@@ -126,17 +114,18 @@ class Kama_Spamblock {
 		global $post;
 
 		// note: is_singular() may work incorrectly
-		if( ! empty( $post ) && ( 'open' !== $post->comment_status ) && is_singular() ){
+		if( $post && ( 'open' !== $post->comment_status ) && is_singular() ){
 			return;
 		}
 		?>
 		<script id="kama_spamblock">
-			(function(){
+			window.addEventListener( 'DOMContentLoaded', function() {
+				document.addEventListener( 'mousedown', handleSubmit );
+				document.addEventListener( 'touchstart', handleSubmit );
+				document.addEventListener( 'keypress', handleSubmit );
 
-				const catch_submit = function( ev ){
-
-					let sbmt = ev.target.closest( '#<?= esc_html( $this->opt->sibmit_button_id ) ?>' );
-
+				function handleSubmit( ev ){
+					let sbmt = ev.target.closest( '#<?= esc_html( sanitize_html_class( $this->opt->sibmit_button_id ) ) ?>' );
 					if( ! sbmt ){
 						return;
 					}
@@ -144,35 +133,30 @@ class Kama_Spamblock {
 					let input = document.createElement( 'input' );
 					let date = new Date();
 
-					input.value = ''+ date.getUTCDate() + (date.getUTCMonth() + 1) + '<?= esc_html( $this->opt->unique_code ) ?>';
+					input.value = ''+ date.getUTCDate() + (date.getUTCMonth() + 1) + '<?= esc_html( Kama_Spamblock_Options::sanitize_uniue_code( $this->opt->unique_code ) ) ?>';
 					input.name = 'ksbn_code';
 					input.type = 'hidden';
 
 					sbmt.parentNode.insertBefore( input, sbmt );
 				}
-
-				document.addEventListener( 'mousedown', catch_submit );
-				document.addEventListener( 'keypress', catch_submit );
-			})()
+			} );
 		</script>
 		<?php
 	}
 
 	/**
-	 * Output form when comment has been blocked.
-	 *
-	 * @return string
+	 * Gets Form HTML for blocked comment.
 	 */
-	private function block_form() {
+	private function block_form(): string {
 		ob_start();
 		?>
 		<h1><?= __( 'Antispam block your comment!', 'kama-spamblock' ) ?></h1>
 
-		<form method="post" action="<?= site_url( '/wp-comments-post.php' ) ?>">
+		<form method="POST" action="<?= site_url( '/wp-comments-post.php' ) ?>">
 			<p>
 				<?= sprintf(
 			       __( 'Copy %1$s to the field %2$s and press button', 'kama-spamblock' ),
-			       '<code style="background:rgba(255,255,255,.2);">' . $this->nonce . '</code>',
+			       '<code style="background:rgba(255,255,255,.2);">' . esc_html( $this->nonce ) . '</code>',
 			       '<input type="text" name="ksbn_code" value="" style="width:150px; border:1px solid #ccc; border-radius:3px; padding:.3em;" />'
 		       ) ?>
 			</p>
@@ -180,10 +164,15 @@ class Kama_Spamblock {
 			<input type="submit" style="height:70px; width:100%; font-size:150%; cursor:pointer; border:none; color:#fff; background:#555;" value="<?= __( 'Send comment again', 'kama-spamblock' ) ?>" />
 
 			<?php
-			unset( $_POST['ksbn_code'] );
-
 			foreach( $_POST as $key => $val ){
-				echo sprintf( '<textarea style="display:none;" name="%s">%s</textarea>', $key, esc_textarea( stripslashes( $val ) ) );
+				if( $key === 'ksbn_code' ){
+					continue;
+				}
+
+				echo sprintf( '<textarea style="display:none;" name="%s">%s</textarea>',
+					esc_attr( $key ),
+					esc_textarea( stripslashes( $val ) )
+				);
 			}
 			?>
 		</form>
