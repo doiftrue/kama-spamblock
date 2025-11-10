@@ -1,14 +1,14 @@
 <?php
 
-class Kama_Spamblock_Options {
+namespace Kama_Spamblock;
 
-	const OPT_NAME = 'ks_options';
+class Options {
 
-	/** @var string */
-	public $sibmit_button_id;
+	public const OPT_NAME = 'ks_options';
 
-	/** @var string */
-	public $unique_code;
+	public string $sibmit_button_id;
+
+	public string $unique_code;
 
 	public function __construct() {
 		$opt = array_merge( $this->default_options(), get_option( self::OPT_NAME, [] ) );
@@ -16,14 +16,11 @@ class Kama_Spamblock_Options {
 
 		$opt = apply_filters( 'kama_spamblock__options', $opt );
 
-		$this->unique_code      = $opt['unique_code'];
-		$this->sibmit_button_id = $opt['sibmit_button_id'];
+		$this->sibmit_button_id = (string) $opt['sibmit_button_id'];
+		$this->unique_code      = (string) $opt['unique_code'];
 	}
 
-	/**
-	 * @return void
-	 */
-	private function check_empty_unique_code( string $code ) {
+	private function check_empty_unique_code( string $code ): void {
 	    if( ! $code ){
 		    $opt = get_option( self::OPT_NAME, [] );
 		    $opt['unique_code'] = wp_generate_password( 10, false );
@@ -38,22 +35,21 @@ class Kama_Spamblock_Options {
 		];
 	}
 
-	public function admin_options() {
-		add_settings_section( 'kama_spamblock', '', '', 'discussion' ); // set no title
+	public function admin_options(): void {
+		add_settings_section( 'Plugin', '', '', 'discussion' ); // set no title
 
 		add_settings_field(
 			self::OPT_NAME . '_field',
 			__( 'Kama Spamblock settings', 'kama-spamblock' ),
 			[ $this, 'options_fields', ],
 			'discussion',
-			'kama_spamblock'
+			'Plugin'
 		);
 
 		register_setting( 'discussion', self::OPT_NAME, [ __CLASS__, 'sanitize_opt' ] );
 	}
 
 	public static function sanitize_opt( $opts ) {
-
 		foreach( $opts as $key => & $val ){
 			if( 'sibmit_button_id' === $key ){
 				$val = sanitize_html_class( $val );
@@ -74,7 +70,7 @@ class Kama_Spamblock_Options {
 		return preg_replace( '~[^A-Za-z0-9*%$#@!_-]~', '', $code );
 	}
 
-	public function options_fields() {
+	public function options_fields(): void {
 		?>
 		<p>
 			<input type="text" name="<?= self::OPT_NAME ?>[sibmit_button_id]" value="<?= esc_attr( $this->sibmit_button_id ) ?>" />
@@ -85,12 +81,6 @@ class Kama_Spamblock_Options {
 			<?= __( 'Any unique code. Change it if you receave spam comments.', 'kama-spamblock' ) ?>
 		</p>
 		<?php
-	}
-
-	public static function settings_link( $links ) {
-		$links[] = sprintf( '<a href="%s">%s</a>', admin_url( '/options-discussion.php#wpfooter' ), __( 'Settings', 'kama-spamblock' ) );
-
-		return $links;
 	}
 
 }

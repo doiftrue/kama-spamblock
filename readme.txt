@@ -1,7 +1,7 @@
 === Plugin Name ===
 Stable tag: trunk
 Contributors: Tkama
-Tested up to: 6.6.2
+Tested up to: 6.8.3
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Tags: spam, spammer, autospam, spamblock, antispam, anti-spam, protect, comments, ping, trackback, bot, robot, human, captcha, invisible
@@ -35,6 +35,10 @@ No! The plugin is invisible to users. You should navigate to the 'Discussion' se
 
 
 == Changelog ==
+
+= 1.9.0 =
+* CHG: Min PHP version increased to 7.4.
+* IMP: Refactoring (Spam_Blocker class extracted).
 
 = 1.8.3 =
 * FIX: XSS vulnerability fixed. Thanks to [Wordfence](https://www.wordfence.com/) for the report.

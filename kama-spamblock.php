@@ -11,25 +11,28 @@
  * Author URI: https://wp-kama.ru
  * Plugin URI: https://wp-kama.ru/95
  *
- * Requires PHP: 7.0
+ * Requires PHP: 7.4
  * Requires at least: 5.7
  *
- * Version: 1.8.3
+ * Version: 1.9.0
  */
 
-require_once __DIR__ . '/Kama_Spamblock.php';
-require_once __DIR__ . '/Kama_Spamblock_Options.php';
+namespace Kama_Spamblock;
 
-add_action( 'init', 'kama_spamblock_init', 11 );
+require_once __DIR__ . '/src/Plugin.php';
+require_once __DIR__ . '/src/Options.php';
+require_once __DIR__ . '/src/Spam_Blocker.php';
 
-function kama_spamblock_init() {
-	return kama_spamblock()->init_plugin();
+add_action( 'init', '\Kama_Spamblock\init', 11 );
+
+function init() {
+	return plugin()->init();
 }
 
-function kama_spamblock(): Kama_Spamblock {
+function plugin(): Plugin {
 	static $inst;
 
-	$inst || $inst = new Kama_Spamblock( __FILE__, new Kama_Spamblock_Options() );
+	$inst || $inst = new Plugin( __FILE__ );
 
 	return $inst;
 }
