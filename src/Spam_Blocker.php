@@ -14,7 +14,7 @@ class Spam_Blocker {
 	private string $nonce;
 
 	public function __construct( Options $opt ) {
-		$this->nonce = self::make_hash( date( 'jn' ) . $opt->unique_code );
+		$this->nonce = self::make_hash( gmdate( 'jn' ) . $opt->unique_code );
 	}
 
 	/**
@@ -35,7 +35,7 @@ class Spam_Blocker {
 		$external_html = wp_remote_retrieve_body( wp_remote_get( $commentdata['comment_author_url'] ) );
 
 		$quoted_home_url = preg_quote( parse_url( home_url(), PHP_URL_HOST ), '~' );
-		$has_backlink = preg_match( "~<a[^>]+href=['\"](https?:)?//$quoted_home_url~si", $external_html );
+		$has_backlink = preg_match( "~<a[^>]+href=['\"](https?:)?//(www\.)?$quoted_home_url~si", $external_html );
 
 		if( ! $has_backlink ){
 			die( 'no backlink.' );
@@ -98,11 +98,11 @@ class Spam_Blocker {
 		return ob_get_clean();
 	}
 
-	public function main_js(): void {
+	public function print_main_js(): void {
 		global $post;
 
 		// note: is_singular() may work incorrectly
-		if( $post && ( 'open' !== $post->comment_status ) && is_singular() ){
+		if ( ! is_singular() || ! comments_open( $post ) ) {
 			return;
 		}
 

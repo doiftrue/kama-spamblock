@@ -34,7 +34,7 @@ class Plugin {
 	}
 
 	private function init_front(): void {
-		add_action( 'wp_footer', [ $this->blocker, 'main_js' ], 0 );
+		add_action( 'wp_footer', [ $this->blocker, 'print_main_js' ], 0 );
 		add_filter( 'preprocess_comment', [ $this->blocker, 'block_spam' ], 0 );
 	}
 
