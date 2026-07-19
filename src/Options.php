@@ -12,7 +12,7 @@ class Options {
 
 	public function __construct() {
 		$opt = array_merge( $this->default_options(), get_option( self::OPT_NAME, [] ) );
-		$this->check_empty_unique_code( $opt['unique_code'] );
+		$opt = $this->ensure_unique_code( $opt );
 
 		$opt = apply_filters( 'kama_spamblock__options', $opt );
 
@@ -20,12 +20,13 @@ class Options {
 		$this->unique_code      = (string) $opt['unique_code'];
 	}
 
-	private function check_empty_unique_code( string $code ): void {
-	    if( ! $code ){
-		    $opt = get_option( self::OPT_NAME, [] );
-		    $opt['unique_code'] = wp_generate_password( 10, false );
-		    update_option( self::OPT_NAME, $opt );
-	    }
+	private function ensure_unique_code( array $opt ): array {
+		if( ! $opt['unique_code'] ){
+			$opt['unique_code'] = wp_generate_password( 10, false );
+			update_option( self::OPT_NAME, $opt );
+		}
+
+		return $opt;
 	}
 
 	public function default_options(): array {

@@ -1,7 +1,7 @@
 === Plugin Name ===
 Stable tag: trunk
 Contributors: Tkama
-Tested up to: 6.8.3
+Tested up to: 7.0.2
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Tags: spam, spammer, autospam, spamblock, antispam, anti-spam, protect, comments, ping, trackback, bot, robot, human, captcha, invisible
@@ -39,6 +39,7 @@ No! The plugin is invisible to users. You should navigate to the 'Discussion' se
 = 1.9.0 =
 * IMP: Return a 403 response for blocked spam comments.
 * FIX: Prevent malformed comment requests from causing PHP errors.
+* FIX: Use a generated unique code immediately after plugin activation.
 * FIX: Minor bugfix.
 * CHG: Min PHP version increased to 7.4.
 * IMP: Refactoring (Spam_Blocker class extracted).
