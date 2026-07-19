@@ -6,15 +6,15 @@ License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Tags: spam, spammer, autospam, spamblock, antispam, anti-spam, protect, comments, ping, trackback, bot, robot, human, captcha, invisible
 
-Light and invisible method to block auto-spam when a spam comment is posted. Pings and trackbacks check for real backlinks.
+Light and invisible protection against basic automated comment spam. Pings and trackbacks check for real backlinks.
 
 
 
 == Description ==
 
-Effectively prevent automatic spam when a spam comment is posted with Kama Spamblock, a plugin that operates discreetly and remains completely invisible to users—no captcha codes required. The plugin not only blocks spam comments but also conducts thorough checks on pings and trackbacks to ensure the authenticity of backlinks.
+Kama Spamblock helps block basic automated spam comments while remaining completely invisible to users—no captcha codes required. It uses a lightweight browser check, so it is not intended to stop sophisticated bots that load pages and execute JavaScript. The plugin also checks pings and trackbacks for backlinks to your site.
 
-Even if you are using an external comment system like Disqus, installing Kama Spamblock remains valuable. This is because autospam can be posted directly to the 'wp-comments-post.php' file, and the plugin serves as a robust defense against such comments.
+Even if you are using an external comment system like Disqus, Kama Spamblock can add lightweight protection. Automated requests can be posted directly to the 'wp-comments-post.php' file, where the plugin can block basic bots.
 
 
 
