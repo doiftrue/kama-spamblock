@@ -37,6 +37,7 @@ No! The plugin is invisible to users. You should navigate to the 'Discussion' se
 == Changelog ==
 
 = 1.9.0 =
+* IMP: Return a 403 response for blocked spam comments.
 * FIX: Minor bugfix.
 * CHG: Min PHP version increased to 7.4.
 * IMP: Refactoring (Spam_Blocker class extracted).

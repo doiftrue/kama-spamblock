@@ -58,7 +58,7 @@ class Spam_Blocker {
 
 		if( self::make_hash( $ksbn_code ) !== $this->nonce ){
 			/** @noinspection ForgottenDebugOutputInspection */
-			wp_die( $this->block_form() );
+			wp_die( $this->block_form(), 'Spam Blocked', [ 'response' => 403 ] );
 		}
 	}
 
