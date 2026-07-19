@@ -27,19 +27,45 @@ class Spam_Blocker {
 		return $commentdata;
 	}
 
-	private function block_pings_trackbacks( $commentdata ): void {
+	private function block_pings_trackbacks( array $commentdata ): void {
 		if( ! in_array( $commentdata['comment_type'], [ 'trackback', 'pingback' ], true ) ){
 			return;
 		}
 
-		$external_html = wp_remote_retrieve_body( wp_remote_get( $commentdata['comment_author_url'] ) );
-
-		$quoted_home_url = preg_quote( parse_url( home_url(), PHP_URL_HOST ), '~' );
-		$has_backlink = preg_match( "~<a[^>]+href=['\"](https?:)?//(www\.)?$quoted_home_url~si", $external_html );
-
-		if( ! $has_backlink ){
-			die( 'no backlink.' );
+		$comment_author_url = $commentdata['comment_author_url'] ?? '';
+		if( ! is_string( $comment_author_url ) ){
+			$this->block_no_backlink();
+			return;
 		}
+
+		$response = wp_safe_remote_get( $comment_author_url, [
+			'timeout'             => 5,
+			'redirection'         => 2,
+			'limit_response_size' => 1024 * 1024,
+		] );
+
+		if( is_wp_error( $response ) ){
+			$this->block_no_backlink();
+			return;
+		}
+
+		$external_html = wp_remote_retrieve_body( $response );
+
+		if( ! $this->has_backlink( $external_html ) ){
+			$this->block_no_backlink();
+		}
+	}
+
+	private function has_backlink( string $html ): bool {
+		$home_host = wp_parse_url( home_url(), PHP_URL_HOST );
+		$quoted_home_url = preg_quote( $home_host, '~' );
+
+		return preg_match( "~<a[^>]+href=['\"](https?:)?//(www\.)?$quoted_home_url(?=[:/?#'\"\\s>])~si", $html );
+	}
+
+	private function block_no_backlink(): void {
+		/** @noinspection ForgottenDebugOutputInspection */
+		wp_die( 'No backlink.', 'Spam Blocked', [ 'response' => 403 ] );
 	}
 
 	private function block_regular_comment( $commentdata ): void {
@@ -54,7 +80,8 @@ class Spam_Blocker {
 			return;
 		}
 
-		$ksbn_code = trim( $_POST['ksbn_code'] ?? '' );
+		$ksbn_code = $_POST['ksbn_code'] ?? '';
+		$ksbn_code = is_string( $ksbn_code ) ? trim( wp_unslash( $ksbn_code ) ) : '';
 
 		if( self::make_hash( $ksbn_code ) !== $this->nonce ){
 			/** @noinspection ForgottenDebugOutputInspection */
@@ -83,13 +110,13 @@ class Spam_Blocker {
 
 			<?php
 			foreach( $_POST as $key => $val ){
-				if( $key === 'ksbn_code' ){
+				if( $key === 'ksbn_code' || ! is_string( $val ) ){
 					continue;
 				}
 
 				echo sprintf( '<textarea style="display:none;" name="%s">%s</textarea>',
 					esc_attr( $key ),
-					esc_textarea( stripslashes( $val ) )
+					esc_textarea( wp_unslash( $val ) )
 				);
 			}
 			?>
