@@ -1,6 +1,6 @@
 <?php
 
-namespace Kama_Spamblock;
+namespace Kama_Spamblock\Guards;
 
 class Trackback_Blocker {
 

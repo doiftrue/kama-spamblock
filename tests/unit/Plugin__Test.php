@@ -2,11 +2,13 @@
 
 namespace Kama_Spamblock;
 
+use Kama_Spamblock\Guards\Comment_Blocker;
+use Kama_Spamblock\Guards\Trackback_Blocker;
 use PHPUnit\Framework\TestCase;
 
 require_once dirname( __DIR__, 2 ) . '/src/Options.php';
-require_once dirname( __DIR__, 2 ) . '/src/Comment_Blocker.php';
-require_once dirname( __DIR__, 2 ) . '/src/Trackback_Blocker.php';
+require_once dirname( __DIR__, 2 ) . '/src/Guards/Comment_Blocker.php';
+require_once dirname( __DIR__, 2 ) . '/src/Guards/Trackback_Blocker.php';
 require_once dirname( __DIR__, 2 ) . '/src/Plugin.php';
 
 function load_plugin_textdomain(): bool {
@@ -24,11 +26,21 @@ function add_filter( string $hook, $callback, int $priority = 10 ): void {
 class Plugin__Test extends TestCase {
 
 	private object $original_options;
+	private bool $had_current_screen;
 	private $original_current_screen;
+	private bool $had_actions;
+	private $original_actions;
+	private bool $had_filters;
+	private $original_filters;
 
 	public function setUp(): void {
 		$this->original_options = clone $GLOBALS['stub_wp_options'];
+		$this->had_current_screen = array_key_exists( 'current_screen', $GLOBALS );
 		$this->original_current_screen = $GLOBALS['current_screen'] ?? null;
+		$this->had_actions = array_key_exists( 'kama_spamblock_test_actions', $GLOBALS );
+		$this->original_actions = $GLOBALS['kama_spamblock_test_actions'] ?? null;
+		$this->had_filters = array_key_exists( 'kama_spamblock_test_filters', $GLOBALS );
+		$this->original_filters = $GLOBALS['kama_spamblock_test_filters'] ?? null;
 		$GLOBALS['stub_wp_options']->ks_options = [
 			'sibmit_button_id' => 'submit',
 			'unique_code'      => 'test-code',
@@ -39,8 +51,9 @@ class Plugin__Test extends TestCase {
 
 	public function tearDown(): void {
 		$GLOBALS['stub_wp_options'] = $this->original_options;
-		$GLOBALS['current_screen'] = $this->original_current_screen;
-		unset( $GLOBALS['kama_spamblock_test_actions'], $GLOBALS['kama_spamblock_test_filters'] );
+		$this->restore_global( 'current_screen', $this->had_current_screen, $this->original_current_screen );
+		$this->restore_global( 'kama_spamblock_test_actions', $this->had_actions, $this->original_actions );
+		$this->restore_global( 'kama_spamblock_test_filters', $this->had_filters, $this->original_filters );
 	}
 
 	public function test__constructor_exposes_plugin_paths_and_services(): void {
@@ -125,5 +138,14 @@ class Plugin__Test extends TestCase {
 		$this->assertSame( '<a href="plugins.php">Plugins</a>', $links[0] );
 		$this->assertStringContainsString( '/options-discussion.php#wpfooter', $links[1] );
 		$this->assertStringContainsString( '>Settings</a>', $links[1] );
+	}
+
+	private function restore_global( string $key, bool $had_value, $value ): void {
+		if( $had_value ){
+			$GLOBALS[ $key ] = $value;
+			return;
+		}
+
+		unset( $GLOBALS[ $key ] );
 	}
 }

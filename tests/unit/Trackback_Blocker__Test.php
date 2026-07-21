@@ -2,10 +2,11 @@
 
 namespace Kama_Spamblock;
 
+use Kama_Spamblock\Guards\Trackback_Blocker;
 use WP_Mock;
 use WP_Mock\Tools\TestCase;
 
-require_once dirname( __DIR__, 2 ) . '/src/Trackback_Blocker.php';
+require_once dirname( __DIR__, 2 ) . '/src/Guards/Trackback_Blocker.php';
 
 class Trackback_Blocker__Test extends TestCase {
 

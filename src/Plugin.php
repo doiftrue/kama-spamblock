@@ -8,16 +8,16 @@ class Plugin {
 	public string $main_file;
 
 	public Options $opt;
-	public Comment_Blocker $comment_blocker;
-	public Trackback_Blocker $trackback_blocker;
+	public Guards\Comment_Blocker $comment_blocker;
+	public Guards\Trackback_Blocker $trackback_blocker;
 
 	public function __construct( string $main_file ) {
 		$this->main_file = $main_file;
 		$this->dir       = dirname( $main_file );
 
 		$this->opt               = new Options();
-		$this->comment_blocker   = new Comment_Blocker( $this->opt );
-		$this->trackback_blocker = new Trackback_Blocker();
+		$this->comment_blocker   = new Guards\Comment_Blocker( $this->opt );
+		$this->trackback_blocker = new Guards\Trackback_Blocker();
 	}
 
 	public function init(): void {

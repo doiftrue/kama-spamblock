@@ -2,11 +2,12 @@
 
 namespace Kama_Spamblock;
 
+use Kama_Spamblock\Guards\Comment_Blocker;
 use WP_Mock;
 use WP_Mock\Tools\TestCase;
 
 require_once dirname( __DIR__, 2 ) . '/src/Options.php';
-require_once dirname( __DIR__, 2 ) . '/src/Comment_Blocker.php';
+require_once dirname( __DIR__, 2 ) . '/src/Guards/Comment_Blocker.php';
 
 class Comment_Blocker__Test extends TestCase {
 

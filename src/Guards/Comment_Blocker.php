@@ -1,6 +1,8 @@
 <?php
 
-namespace Kama_Spamblock;
+namespace Kama_Spamblock\Guards;
+
+use Kama_Spamblock\Options;
 
 class Comment_Blocker {
 
