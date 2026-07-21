@@ -1,0 +1,22 @@
+{
+  "name": "doiftrue/kama-spamblock",
+  "description": "Light and invisible protection against basic automated comment spam.",
+  "type": "wordpress-plugin",
+  "homepage": "https://github.com/doiftrue/kama-spamblock",
+  "license": "GPL-2.0-or-later",
+  "scripts": {
+    "phpunit": "./vendor/bin/phpunit"
+  },
+  "require-dev": {
+    "doiftrue/unitest-wp-copy": "7.0.*",
+    "10up/wp_mock": "^1.1.1"
+  },
+  "authors": [
+    {
+      "name": "Kama",
+      "email": "tnkamaev@gmail.com",
+      "role": "Developer",
+      "homepage": "https://wp-kama.com/plugin/kama-spamblock"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+<!-- @see https://phpunit.readthedocs.io/en/9.5/configuration.html -->
+<phpunit
+	bootstrap="tests/unit/bootstrap.php"
+	cacheResultFile="tmp/.phpunit.result.cache"
+	colors="true"
+	verbose="true"
+>
+	<testsuites>
+		<testsuite name="Kama Spamblock">
+			<directory suffix="__Test.php">./tests/unit</directory>
+		</testsuite>
+	</testsuites>
+</phpunit>

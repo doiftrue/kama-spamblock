@@ -1,1 +1,6 @@
 /tmp/
+/vendor/
+/node_modules/
+/_TODO/
+
+/composer.lock
