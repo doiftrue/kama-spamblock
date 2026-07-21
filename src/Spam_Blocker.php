@@ -17,9 +17,6 @@ class Spam_Blocker {
 		$this->nonce = self::make_hash( gmdate( 'jn' ) . $opt->unique_code );
 	}
 
-	/**
-	 * Check and block comment if needed.
-	 */
 	public function block_spam( array $commentdata ): array {
 		$this->block_pings_trackbacks( $commentdata );
 		$this->block_regular_comment( $commentdata );
