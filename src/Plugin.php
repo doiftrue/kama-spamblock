@@ -8,16 +8,16 @@ class Plugin {
 	public string $main_file;
 
 	public Options $opt;
-	public Comment_Spam_Blocker $comment_spam_blocker;
-	public Trackback_Spam_Blocker $trackback_spam_blocker;
+	public Comment_Blocker $comment_blocker;
+	public Trackback_Blocker $trackback_blocker;
 
 	public function __construct( string $main_file ) {
 		$this->main_file = $main_file;
 		$this->dir       = dirname( $main_file );
 
-		$this->opt                    = new Options();
-		$this->comment_spam_blocker   = new Comment_Spam_Blocker( $this->opt );
-		$this->trackback_spam_blocker = new Trackback_Spam_Blocker();
+		$this->opt               = new Options();
+		$this->comment_blocker   = new Comment_Blocker( $this->opt );
+		$this->trackback_blocker = new Trackback_Blocker();
 	}
 
 	public function init(): void {
@@ -36,13 +36,13 @@ class Plugin {
 	}
 
 	private function init_front(): void {
-		add_action( 'wp_footer', [ $this->comment_spam_blocker, 'print_main_js' ], 0 );
+		add_action( 'wp_footer', [ $this->comment_blocker, 'print_main_js' ], 0 );
 		add_filter( 'preprocess_comment', [ $this, 'block_spam' ], 0 );
 	}
 
 	public function block_spam( array $commentdata ): array {
-		$this->trackback_spam_blocker->block_spam( $commentdata );
-		$this->comment_spam_blocker->block_spam( $commentdata );
+		$this->trackback_blocker->block_spam( $commentdata );
+		$this->comment_blocker->block_spam( $commentdata );
 
 		return $commentdata;
 	}

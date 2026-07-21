@@ -2,7 +2,7 @@
 
 namespace Kama_Spamblock;
 
-class Comment_Spam_Blocker {
+class Comment_Blocker {
 
 	/**
 	 * `comment` for WP 5.5+

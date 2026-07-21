@@ -5,9 +5,9 @@ namespace Kama_Spamblock;
 use WP_Mock;
 use WP_Mock\Tools\TestCase;
 
-require_once dirname( __DIR__, 2 ) . '/src/Trackback_Spam_Blocker.php';
+require_once dirname( __DIR__, 2 ) . '/src/Trackback_Blocker.php';
 
-class Trackback_Spam_Blocker__Test extends TestCase {
+class Trackback_Blocker__Test extends TestCase {
 
 	public function test__pingback_with_backlink_is_allowed(): void {
 		WP_Mock::userFunction( 'wp_safe_remote_get' )
@@ -43,7 +43,7 @@ class Trackback_Spam_Blocker__Test extends TestCase {
 		$this->assertTrue( true );
 	}
 
-	private function blocker(): Trackback_Spam_Blocker {
-		return new Trackback_Spam_Blocker();
+	private function blocker(): Trackback_Blocker {
+		return new Trackback_Blocker();
 	}
 }

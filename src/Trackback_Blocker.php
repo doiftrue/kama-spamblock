@@ -2,7 +2,7 @@
 
 namespace Kama_Spamblock;
 
-class Trackback_Spam_Blocker {
+class Trackback_Blocker {
 
 	public function block_spam( array $commentdata ): void {
 		if( ! in_array( $commentdata['comment_type'], [ 'trackback', 'pingback' ], true ) ){

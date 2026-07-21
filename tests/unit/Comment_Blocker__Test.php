@@ -6,9 +6,9 @@ use WP_Mock;
 use WP_Mock\Tools\TestCase;
 
 require_once dirname( __DIR__, 2 ) . '/src/Options.php';
-require_once dirname( __DIR__, 2 ) . '/src/Comment_Spam_Blocker.php';
+require_once dirname( __DIR__, 2 ) . '/src/Comment_Blocker.php';
 
-class Comment_Spam_Blocker__Test extends TestCase {
+class Comment_Blocker__Test extends TestCase {
 
 	private object $original_options;
 	private array $original_post;
@@ -35,8 +35,8 @@ class Comment_Spam_Blocker__Test extends TestCase {
 	public function test__make_hash_keeps_hash_or_hashes_plain_key(): void {
 		$hash = '0123456789abcdef0123456789abcdef';
 
-		$this->assertSame( $hash, Comment_Spam_Blocker::make_hash( $hash ) );
-		$this->assertSame( md5( 'plain-key' ), Comment_Spam_Blocker::make_hash( 'plain-key' ) );
+		$this->assertSame( $hash, Comment_Blocker::make_hash( $hash ) );
+		$this->assertSame( md5( 'plain-key' ), Comment_Blocker::make_hash( 'plain-key' ) );
 	}
 
 	public function test__regular_comment_with_current_code_is_allowed(): void {
@@ -91,7 +91,7 @@ class Comment_Spam_Blocker__Test extends TestCase {
 		$this->assertStringContainsString( "input.name = 'ksbn_code'", $html );
 	}
 
-	private function blocker(): Comment_Spam_Blocker {
-		return new Comment_Spam_Blocker( new Options() );
+	private function blocker(): Comment_Blocker {
+		return new Comment_Blocker( new Options() );
 	}
 }
