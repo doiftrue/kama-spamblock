@@ -21,7 +21,8 @@ namespace Kama_Spamblock;
 
 require_once __DIR__ . '/src/Plugin.php';
 require_once __DIR__ . '/src/Options.php';
-require_once __DIR__ . '/src/Spam_Blocker.php';
+require_once __DIR__ . '/src/Comment_Spam_Blocker.php';
+require_once __DIR__ . '/src/Trackback_Spam_Blocker.php';
 
 add_action( 'init', '\Kama_Spamblock\init', 11 );
 

@@ -2,76 +2,30 @@
 
 namespace Kama_Spamblock;
 
-class Spam_Blocker {
+class Comment_Spam_Blocker {
 
 	/**
 	 * `comment` for WP 5.5+
 	 *
 	 * @var string[]
 	 */
-	private array $regular_comment_types = [ '', 'comment' ];
+	private array $comment_types = [ '', 'comment' ];
 
+	private Options $opt;
 	private string $nonce;
 
 	public function __construct( Options $opt ) {
+		$this->opt = $opt;
 		$this->nonce = self::make_hash( gmdate( 'jn' ) . $opt->unique_code );
 	}
 
-	public function block_spam( array $commentdata ): array {
-		$this->block_pings_trackbacks( $commentdata );
-		$this->block_regular_comment( $commentdata );
-
-		return $commentdata;
-	}
-
-	private function block_pings_trackbacks( array $commentdata ): void {
-		if( ! in_array( $commentdata['comment_type'], [ 'trackback', 'pingback' ], true ) ){
-			return;
-		}
-
-		$comment_author_url = $commentdata['comment_author_url'] ?? '';
-		if( ! is_string( $comment_author_url ) ){
-			$this->block_no_backlink();
-			return;
-		}
-
-		$response = wp_safe_remote_get( $comment_author_url, [
-			'timeout'             => 5,
-			'redirection'         => 2,
-			'limit_response_size' => 1024 * 1024,
-		] );
-
-		if( is_wp_error( $response ) ){
-			$this->block_no_backlink();
-			return;
-		}
-
-		$external_html = wp_remote_retrieve_body( $response );
-
-		if( ! $this->has_backlink( $external_html ) ){
-			$this->block_no_backlink();
-		}
-	}
-
-	private function has_backlink( string $html ): bool {
-		$home_host = wp_parse_url( home_url(), PHP_URL_HOST );
-		$quoted_home_url = preg_quote( $home_host, '~' );
-
-		return preg_match( "~<a[^>]+href=['\"](https?:)?//(www\.)?$quoted_home_url(?=[:/?#'\"\\s>])~si", $html );
-	}
-
-	private function block_no_backlink(): void {
-		/** @noinspection ForgottenDebugOutputInspection */
-		wp_die( 'No backlink.', 'Spam Blocked', [ 'response' => 403 ] );
-	}
-
-	private function block_regular_comment( $commentdata ): void {
+	public function block_spam( array $commentdata ): void {
 		/**
-		 * Allowes to filter comment types to process.
+		 * Allows filtering comment types to process.
 		 *
 		 * @param string[] $comment_types Array of comment types to process. Default: `['', 'comment']`.
 		 */
-		$comment_types = apply_filters( 'kama_spamblock__process_comment_types', $this->regular_comment_types );
+		$comment_types = apply_filters( 'kama_spamblock__process_comment_types', $this->comment_types );
 
 		if( ! in_array( $commentdata['comment_type'], $comment_types, true ) ) {
 			return;
@@ -130,8 +84,8 @@ class Spam_Blocker {
 			return;
 		}
 
-		$selector = '#' . esc_html( sanitize_html_class( plugin()->opt->sibmit_button_id ) );
-		$uniqcode = esc_html( Options::sanitize_uniue_code( plugin()->opt->unique_code ) );
+		$selector = '#' . esc_html( sanitize_html_class( $this->opt->sibmit_button_id ) );
+		$uniqcode = esc_html( Options::sanitize_uniue_code( $this->opt->unique_code ) );
 		?>
 		<script id="kama_spamblock">
 			window.addEventListener( 'DOMContentLoaded', function() {

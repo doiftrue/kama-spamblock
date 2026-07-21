@@ -5,7 +5,8 @@ namespace Kama_Spamblock;
 use PHPUnit\Framework\TestCase;
 
 require_once dirname( __DIR__, 2 ) . '/src/Options.php';
-require_once dirname( __DIR__, 2 ) . '/src/Spam_Blocker.php';
+require_once dirname( __DIR__, 2 ) . '/src/Comment_Spam_Blocker.php';
+require_once dirname( __DIR__, 2 ) . '/src/Trackback_Spam_Blocker.php';
 require_once dirname( __DIR__, 2 ) . '/src/Plugin.php';
 
 function load_plugin_textdomain(): bool {
@@ -48,7 +49,8 @@ class Plugin__Test extends TestCase {
 		$this->assertSame( '/plugins/kama-spamblock/kama-spamblock.php', $plugin->main_file );
 		$this->assertSame( '/plugins/kama-spamblock', $plugin->dir );
 		$this->assertInstanceOf( Options::class, $plugin->opt );
-		$this->assertInstanceOf( Spam_Blocker::class, $plugin->blocker );
+		$this->assertInstanceOf( Comment_Spam_Blocker::class, $plugin->comment_spam_blocker );
+		$this->assertInstanceOf( Trackback_Spam_Blocker::class, $plugin->trackback_spam_blocker );
 	}
 
 	public function test__init_registers_admin_hooks(): void {
@@ -84,13 +86,37 @@ class Plugin__Test extends TestCase {
 		$plugin->init();
 
 		$this->assertSame(
-			[ [ 'wp_footer', [ $plugin->blocker, 'print_main_js' ], 0 ] ],
+			[ [ 'wp_footer', [ $plugin->comment_spam_blocker, 'print_main_js' ], 0 ] ],
 			$GLOBALS['kama_spamblock_test_actions']
 		);
 		$this->assertSame(
-			[ [ 'preprocess_comment', [ $plugin->blocker, 'block_spam' ], 0 ] ],
+			[ [ 'preprocess_comment', [ $plugin, 'block_spam' ], 0 ] ],
 			$GLOBALS['kama_spamblock_test_filters']
 		);
+	}
+
+	public function test__block_spam_delegates_to_both_blockers_and_returns_commentdata(): void {
+		$plugin = new Plugin( '/plugins/kama-spamblock/kama-spamblock.php' );
+		$commentdata = [ 'comment_type' => 'custom', 'comment_content' => 'Hello' ];
+
+		$plugin->trackback_spam_blocker = new class extends Trackback_Spam_Blocker {
+			public array $calls = [];
+
+			public function block_spam( array $commentdata ): void {
+				$this->calls[] = $commentdata;
+			}
+		};
+		$plugin->comment_spam_blocker = new class( $plugin->opt ) extends Comment_Spam_Blocker {
+			public array $calls = [];
+
+			public function block_spam( array $commentdata ): void {
+				$this->calls[] = $commentdata;
+			}
+		};
+
+		$this->assertSame( $commentdata, $plugin->block_spam( $commentdata ) );
+		$this->assertSame( [ $commentdata ], $plugin->trackback_spam_blocker->calls );
+		$this->assertSame( [ $commentdata ], $plugin->comment_spam_blocker->calls );
 	}
 
 	public function test__settings_link_appends_discussion_settings_link(): void {
