@@ -44,16 +44,16 @@ class Comment_Blocker__Test extends TestCase {
 	}
 
 	public function test__regular_comment_with_current_code_is_allowed(): void {
-		$_POST['spamblock_code'] = gmdate( 'jn' ) . 'test-code';
+		$_POST['spamblock_code'] = $this->plain_token( 123 );
 		$_POST['spamblock_code_time'] = '3';
 
-		$this->blocker()->block_spam( [ 'comment_type' => 'comment' ] );
+		$this->blocker()->block_spam( [ 'comment_type' => 'comment', 'comment_post_ID' => 123 ] );
 
 		$this->assertTrue( true );
 	}
 
 	public function test__regular_comment_without_current_code_is_blocked_with_retry_form(): void {
-		$_POST = [ 'comment' => 'Keep me', 'spamblock_code' => 'invalid' ];
+		$_POST = [ 'comment' => 'Keep me', 'comment_post_ID' => '123', 'spamblock_code' => 'invalid' ];
 
 		WP_Mock::userFunction( 'wp_die' )
 			->once()
@@ -71,28 +71,28 @@ class Comment_Blocker__Test extends TestCase {
 				[ 'response' => 403 ]
 			);
 
-		$this->blocker()->block_spam( [ 'comment_type' => 'comment' ] );
+		$this->blocker()->block_spam( [ 'comment_type' => 'comment', 'comment_post_ID' => 123 ] );
 		$this->assertTrue( true );
 	}
 
 	public function test__retry_challenge_has_three_markup_variants(): void {
 		$blocker = $this->blocker();
 		$render = Closure::bind(
-			fn( int $variant ) => $this->render_challenge_html( $variant ),
+			fn( string $token, int $variant ) => $this->render_challenge_html( $token, $variant ),
 			$blocker,
 			Comment_Blocker::class
 		);
-		$token = md5( gmdate( 'jn' ) . 'test-code' );
+		$token = md5( $this->plain_token( 123 ) );
 		$parts = str_split( $token, 11 );
 
-		$this->assertStringContainsString( ">$token<", $render( 3 ) );
+		$this->assertStringContainsString( ">$token<", $render( $token, 3 ) );
 
-		$split = $render( 1 );
+		$split = $render( $token, 1 );
 		$this->assertStringContainsString( ">$parts[0]<", $split );
 		$this->assertStringContainsString( ">$parts[1]<", $split );
 		$this->assertStringContainsString( ">$parts[2]<", $split );
 
-		$data = $render( 2 );
+		$data = $render( $token, 2 );
 		$this->assertStringContainsString( 'data-a="' . $parts[1] . '"', $data );
 		$this->assertStringContainsString( 'data-b="' . $parts[2] . '"', $data );
 		$this->assertStringContainsString( 'data-c="' . $parts[0] . '"', $data );
@@ -119,7 +119,9 @@ class Comment_Blocker__Test extends TestCase {
 		$html = (string) ob_get_clean();
 
 		$this->assertStringContainsString( "closest( '#send-comment' )", $html );
-		$this->assertStringContainsString( "(date.getUTCMonth() + 1) + 'test-code'", $html );
+		$this->assertStringContainsString( 'date.getUTCFullYear()', $html );
+		$this->assertStringContainsString( "form.elements['comment_post_ID'].value", $html );
+		$this->assertStringContainsString( "utcDate + '|' + postId + '|test-code'", $html );
 		$this->assertMatchesRegularExpression( "/\\.name = 'spamblock_code';/", $html );
 		$this->assertMatchesRegularExpression( "/\\.name = 'spamblock_code_time';/", $html );
 		$this->assertStringContainsString( 'performance.now() - formStart', $html );
@@ -130,23 +132,52 @@ class Comment_Blocker__Test extends TestCase {
 			'old_spamblock_code:' . ( time() - 14400 ),
 			'spamblock_code:' . time(),
 		];
-		$_POST['old_spamblock_code'] = gmdate( 'jn' ) . 'test-code';
+		$_POST['old_spamblock_code'] = $this->plain_token( 123 );
 		$_POST['old_spamblock_code_time'] = '3';
 
-		$this->blocker()->block_spam( [ 'comment_type' => 'comment' ] );
+		$this->blocker()->block_spam( [ 'comment_type' => 'comment', 'comment_post_ID' => 123 ] );
 
 		$this->assertTrue( true );
 	}
 
 	public function test__regular_comment_is_blocked_when_submitted_too_soon(): void {
-		$_POST['spamblock_code'] = gmdate( 'jn' ) . 'test-code';
+		$_POST['spamblock_code'] = $this->plain_token( 123 );
 		$_POST['spamblock_code_time'] = '2';
 
 		WP_Mock::userFunction( 'wp_die' )
 			->once()
 			->with( \Mockery::type( 'string' ), 'Spam Blocked', [ 'response' => 403 ] );
 
-		$this->blocker()->block_spam( [ 'comment_type' => 'comment' ] );
+		$this->blocker()->block_spam( [ 'comment_type' => 'comment', 'comment_post_ID' => 123 ] );
+		$this->assertTrue( true );
+	}
+
+	public function test__regular_comment_with_token_for_another_post_is_blocked(): void {
+		$_POST['spamblock_code'] = $this->plain_token( 123 );
+		$_POST['spamblock_code_time'] = '3';
+
+		WP_Mock::userFunction( 'wp_die' )
+			->once()
+			->with( \Mockery::type( 'string' ), 'Spam Blocked', [ 'response' => 403 ] );
+
+		$this->blocker()->block_spam( [ 'comment_type' => 'comment', 'comment_post_ID' => 456 ] );
+		$this->assertTrue( true );
+	}
+
+	public function test__regular_comment_with_token_for_another_date_is_blocked(): void {
+		$previous_day = gmdate( 'Y-m-d', time() - DAY_IN_SECONDS );
+		$previous_year = ( (int) gmdate( 'Y' ) - 1 ) . gmdate( '-m-d' );
+		$_POST['spamblock_code_time'] = '3';
+
+		WP_Mock::userFunction( 'wp_die' )
+			->twice()
+			->with( \Mockery::type( 'string' ), 'Spam Blocked', [ 'response' => 403 ] );
+
+		foreach( [ $previous_day, $previous_year ] as $date ){
+			$_POST['spamblock_code'] = $this->plain_token( 123, $date );
+			$this->blocker()->block_spam( [ 'comment_type' => 'comment', 'comment_post_ID' => 123 ] );
+		}
+
 		$this->assertTrue( true );
 	}
 
@@ -201,6 +232,10 @@ class Comment_Blocker__Test extends TestCase {
 		$blocker->init();
 
 		return $blocker;
+	}
+
+	private function plain_token( int $post_id, ?string $date = null ): string {
+		return ( $date ?? gmdate( 'Y-m-d' ) ) . "|$post_id|test-code";
 	}
 
 }

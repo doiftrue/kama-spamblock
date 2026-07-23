@@ -17,9 +17,6 @@ class Comment_Blocker {
 
 	private Options $options;
 
-	/** Token value. */
-	private string $token;
-
 	/** Current using token name for field. */
 	private string $token_name;
 
@@ -29,7 +26,6 @@ class Comment_Blocker {
 
 	public function __construct( Options $options ) {
 		$this->options = $options;
-		$this->token = self::ensure_hash( gmdate( 'jn' ) . $options->unique_code );
 	}
 
 	public function init(): void {
@@ -60,14 +56,20 @@ class Comment_Blocker {
 			}
 		}
 
+		$expected_token = $this->make_token( (int) ( $commentdata['comment_post_ID'] ?? 0 ) );
+
 		if(
 			( $passed_sec < self::MIN_FILL_DURATION_SEC )
 			||
-			( self::ensure_hash( $token ) !== $this->token )
+			( self::ensure_hash( $token ) !== $expected_token )
 		){
 			/** @noinspection ForgottenDebugOutputInspection */
-			wp_die( $this->block_form(), 'Spam Blocked', [ 'response' => 403 ] );
+			wp_die( $this->block_form( $expected_token ), 'Spam Blocked', [ 'response' => 403 ] );
 		}
+	}
+
+	private function make_token( int $post_id ): string {
+		return self::ensure_hash( gmdate( 'Y-m-d' ) . "|$post_id|" . $this->options->unique_code );
 	}
 
 	/**
@@ -80,7 +82,7 @@ class Comment_Blocker {
 	/**
 	 * Gets Form HTML for blocked comment.
 	 */
-	private function block_form(): string {
+	private function block_form( string $token ): string {
 		ob_start();
 		$token_flname = esc_html( $this->token_name );
 		$time_flname = esc_html( $this->get_time_field_name( $this->token_name ) );
@@ -99,7 +101,7 @@ class Comment_Blocker {
 			<p>
 				<?= strtr(
 					__( 'Replace the value in the field below with {CODE} and click the button.', 'kama-spamblock' ), [
-					'{CODE}' => $this->render_challenge_html( wp_rand( 1, 3 ) )
+					'{CODE}' => $this->render_challenge_html( $token, wp_rand( 1, 3 ) )
 				] ) ?>
 			</p>
 
@@ -137,9 +139,9 @@ class Comment_Blocker {
 		return ob_get_clean();
 	}
 
-	private function render_challenge_html( int $variant ): string {
+	private function render_challenge_html( string $token, int $variant ): string {
 		$tag = esc_html( $this->token_name );
-		$parts = str_split( $this->token, 11 );
+		$parts = str_split( $token, 11 );
 
 		switch( $variant ){
 			case 1:
@@ -155,7 +157,7 @@ class Comment_Blocker {
 				);
 			case 3:
 			default:
-				return "<$tag>" . esc_html( $this->token ) . "</$tag>";
+				return "<$tag>" . esc_html( $token ) . "</$tag>";
 		}
 	}
 
@@ -187,10 +189,12 @@ class Comment_Blocker {
 					}
 
 					let date = new Date();
+					let utcDate = date.getUTCFullYear() + '-' + ( '0' + ( date.getUTCMonth() + 1 ) ).slice( -2 ) + '-' + ( '0' + date.getUTCDate() ).slice( -2 );
+					let postId = sbmt.form.elements['comment_post_ID'].value;
 					let $token_flname = document.createElement( 'input' );
 					$token_flname.type = 'hidden';
 					$token_flname.name = '$token_flname';
-					$token_flname.value = '' + date.getUTCDate() + (date.getUTCMonth() + 1) + '$uniq_code';
+					$token_flname.value = utcDate + '|' + postId + '|$uniq_code';
 					sbmt.before( $token_flname );
 
 					let dur = document.createElement( 'input' );
