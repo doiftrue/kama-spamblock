@@ -20,6 +20,20 @@ This is a basic check, not proof that a person wrote the comment. Bots that load
 
 Even if you are using an external comment system like Disqus, Kama Spamblock can add lightweight protection. Automated requests can be posted directly to the 'wp-comments-post.php' file, where the plugin can block basic bots.
 
+= Simple and effective protection =
+
+Kama Spamblock combines several small checks that are inexpensive for the site and invisible during normal commenting:
+
+* The protective field name rotates while recent names remain valid for pages served from full-page cache.
+* Each marker is tied to the current UTC date and the specific WordPress post.
+* The form must remain open for at least three seconds before it can be accepted.
+* Protective fields are added only after interaction with the comment submit button.
+* If a valid comment is blocked, a JavaScript-only retry form preserves the entered data.
+* The retry challenge changes its HTML structure to make basic scraping less reliable.
+* Pingbacks and trackbacks must return a successful HTTP response, non-binary content, and a real backlink.
+
+These checks deliberately remain lightweight. A capable bot that loads the page, runs JavaScript, and reproduces normal browser behaviour can still pass them.
+
 = Using Kama Spamblock with other anti-spam plugins =
 
 Kama Spamblock can work with a full anti-spam plugin or service. It blocks simple direct spam requests first. The other tool can then check the comments that remain. For example, it can analyse comment text, reputation, or behaviour. The plugins complement each other.
