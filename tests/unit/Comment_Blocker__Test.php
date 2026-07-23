@@ -2,6 +2,7 @@
 
 namespace Kama_Spamblock;
 
+use Closure;
 use Kama_Spamblock\Guards\Comment_Blocker;
 use WP_Mock;
 use WP_Mock\Tools\TestCase;
@@ -35,9 +36,10 @@ class Comment_Blocker__Test extends TestCase {
 
 	public function test__make_hash_keeps_hash_or_hashes_plain_key(): void {
 		$hash = '0123456789abcdef0123456789abcdef';
+		$call = Closure::bind( fn( $key ) => Comment_Blocker::make_hash( $key ), null, Comment_Blocker::class );
 
-		$this->assertSame( $hash, Comment_Blocker::make_hash( $hash ) );
-		$this->assertSame( md5( 'plain-key' ), Comment_Blocker::make_hash( 'plain-key' ) );
+		$this->assertSame( $hash, $call( $hash ) );
+		$this->assertSame( md5( 'plain-key' ), $call( 'plain-key' ) );
 	}
 
 	public function test__regular_comment_with_current_code_is_allowed(): void {
@@ -93,6 +95,9 @@ class Comment_Blocker__Test extends TestCase {
 	}
 
 	private function blocker(): Comment_Blocker {
-		return new Comment_Blocker( new Options() );
+		$blocker = new Comment_Blocker( new Options() );
+		$blocker->init();
+
+		return $blocker;
 	}
 }

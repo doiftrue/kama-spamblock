@@ -28,6 +28,8 @@ class Plugin {
 		is_admin()
 			? $this->init_admin()
 			: $this->init_front();
+
+		$this->comment_blocker->init();
 	}
 
 	private function init_admin(): void {

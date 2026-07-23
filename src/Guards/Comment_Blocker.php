@@ -15,10 +15,15 @@ class Comment_Blocker {
 
 	private Options $opt;
 	private string $nonce;
+	private string $nonce_field_name;
 
 	public function __construct( Options $opt ) {
 		$this->opt = $opt;
 		$this->nonce = self::make_hash( gmdate( 'jn' ) . $opt->unique_code );
+	}
+
+	public function init(): void {
+		$this->nonce_field_name = 'ksbn_code';
 	}
 
 	public function block_spam( array $commentdata ): void {
@@ -33,7 +38,7 @@ class Comment_Blocker {
 			return;
 		}
 
-		$ksbn_code = $_POST['ksbn_code'] ?? '';
+		$ksbn_code = $_POST[ $this->nonce_field_name ] ?? '';
 		$ksbn_code = is_string( $ksbn_code ) ? trim( wp_unslash( $ksbn_code ) ) : '';
 
 		if( self::make_hash( $ksbn_code ) !== $this->nonce ){
@@ -47,32 +52,44 @@ class Comment_Blocker {
 	 */
 	private function block_form(): string {
 		ob_start();
+		$field_name = $this->nonce_field_name;
 		?>
 		<h1><?= __( 'Antispam block your comment!', 'kama-spamblock' ) ?></h1>
 
-		<form method="POST" action="<?= site_url( '/wp-comments-post.php' ) ?>">
+		<style>
+			.kama-spamblock-form { max-width:45rem; margin: auto; }
+			.kama-spamblock-form textarea { display:none; }
+			.kama-spamblock-form textarea[name="<?= $field_name ?>"] { display:block; width:100%; height:3em; box-sizing:border-box; margin:1.5em 0; }
+			.kama-spamblock-form button { height:70px; width:100%; font-size:150%; cursor:pointer; border:none; color:#fff; background:#555; }
+		</style>
+
+		<form class="kama-spamblock-form" method="POST" action="<?= site_url( '/wp-comments-post.php' ) ?>">
 			<p>
-				<?= sprintf(
-					__( 'Copy %1$s to the field %2$s and press button', 'kama-spamblock' ),
-					'<code style="background:rgba(255,255,255,.2);">' . esc_html( $this->nonce ) . '</code>',
-					'<input type="text" name="ksbn_code" value="" style="width:150px; border:1px solid #ccc; border-radius:3px; padding:.3em;" />'
-				) ?>
+				<?= strtr(
+					__( 'Replace the value in the field below with {CODE} and click the button.', 'kama-spamblock' ), [
+					'{CODE}' => "<$field_name>" . esc_html( $this->nonce ) . "</$field_name>"
+				] ) ?>
 			</p>
 
-			<input type="submit" style="height:70px; width:100%; font-size:150%; cursor:pointer; border:none; color:#fff; background:#555;" value="<?= __( 'Send comment again', 'kama-spamblock' ) ?>" />
-
 			<?php
+			// we set value here just to the field has any value to make similar to other fields (this val never used)
+			$fields = [
+				sprintf( '<textarea name="%s">%s</textarea>', $field_name, esc_textarea( (string) ( $_POST['comment_post_ID'] ?? '' ) ) )
+			];
 			foreach( $_POST as $key => $val ){
-				if( $key === 'ksbn_code' || ! is_string( $val ) ){
+				if( $key === $field_name || ! is_string( $val ) ){
 					continue;
 				}
 
-				echo sprintf( '<textarea style="display:none;" name="%s">%s</textarea>',
-					esc_attr( $key ),
-					esc_textarea( wp_unslash( $val ) )
-				);
+				$fields[] = sprintf( '<textarea name="%s">%s</textarea>', esc_attr( $key ), esc_textarea( wp_unslash( $val ) ) );
 			}
+
+			shuffle( $fields );
+			$fields = implode( "\n", $fields );
+			echo $fields;
 			?>
+
+			<button type="submit"><?= __( 'Send comment again', 'kama-spamblock' ) ?></button>
 		</form>
 		<?php
 		return ob_get_clean();
@@ -105,7 +122,7 @@ class Comment_Blocker {
 					let date = new Date();
 
 					input.value = ''+ date.getUTCDate() + (date.getUTCMonth() + 1) + '<?= $uniqcode ?>';
-					input.name = 'ksbn_code';
+					input.name = '<?= $this->nonce_field_name ?>';
 					input.type = 'hidden';
 
 					sbmt.parentNode.insertBefore( input, sbmt );
@@ -118,7 +135,7 @@ class Comment_Blocker {
 	/**
 	 * Creates hash from specified key if it's not hashed yet.
 	 */
-	public static function make_hash( string $key ): string {
+	private static function make_hash( string $key ): string {
 		return preg_match( '/^[a-f0-9]{32}$/', $key ) ? $key : md5( $key );
 	}
 
