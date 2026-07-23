@@ -35,9 +35,9 @@ class Comment_Blocker__Test extends TestCase {
 		parent::tearDown();
 	}
 
-	public function test__make_hash_keeps_hash_or_hashes_plain_key(): void {
+	public function test__ensure_hash_keeps_hash_or_hashes_plain_key(): void {
 		$hash = '0123456789abcdef0123456789abcdef';
-		$call = Closure::bind( fn( $key ) => Comment_Blocker::make_hash( $key ), null, Comment_Blocker::class );
+		$call = Closure::bind( fn( $key ) => Comment_Blocker::ensure_hash( $key ), null, Comment_Blocker::class );
 
 		$this->assertSame( $hash, $call( $hash ) );
 		$this->assertSame( md5( 'plain-key' ), $call( 'plain-key' ) );
@@ -45,6 +45,7 @@ class Comment_Blocker__Test extends TestCase {
 
 	public function test__regular_comment_with_current_code_is_allowed(): void {
 		$_POST['spamblock_code'] = gmdate( 'jn' ) . 'test-code';
+		$_POST['spamblock_code_time'] = '3';
 
 		$this->blocker()->block_spam( [ 'comment_type' => 'comment' ] );
 
@@ -60,9 +61,10 @@ class Comment_Blocker__Test extends TestCase {
 				\Mockery::on( static function ( string $html ): bool {
 					return false !== strpos( $html, 'Antispam block your comment!' )
 						&& false !== strpos( $html, 'name="spamblock_code"' )
+						&& false !== strpos( $html, 'name="spamblock_code_time"' )
+						&& false !== strpos( $html, "form.elements['spamblock_code_time']" )
 						&& false !== strpos( $html, 'name="comment"' )
 						&& false !== strpos( $html, '<button type="button">' )
-						&& false !== strpos( $html, 'this.form.requestSubmit()' )
 						&& false === strpos( $html, 'name="spamblock_code">invalid' );
 				} ),
 				'Spam Blocked',
@@ -71,6 +73,30 @@ class Comment_Blocker__Test extends TestCase {
 
 		$this->blocker()->block_spam( [ 'comment_type' => 'comment' ] );
 		$this->assertTrue( true );
+	}
+
+	public function test__retry_challenge_has_three_markup_variants(): void {
+		$blocker = $this->blocker();
+		$render = Closure::bind(
+			fn( int $variant ) => $this->render_challenge_html( $variant ),
+			$blocker,
+			Comment_Blocker::class
+		);
+		$token = md5( gmdate( 'jn' ) . 'test-code' );
+		$parts = str_split( $token, 11 );
+
+		$this->assertStringContainsString( ">$token<", $render( 3 ) );
+
+		$split = $render( 1 );
+		$this->assertStringContainsString( ">$parts[0]<", $split );
+		$this->assertStringContainsString( ">$parts[1]<", $split );
+		$this->assertStringContainsString( ">$parts[2]<", $split );
+
+		$data = $render( 2 );
+		$this->assertStringContainsString( 'data-a="' . $parts[1] . '"', $data );
+		$this->assertStringContainsString( 'data-b="' . $parts[2] . '"', $data );
+		$this->assertStringContainsString( 'data-c="' . $parts[0] . '"', $data );
+		$this->assertStringContainsString( 'el.dataset.c+el.dataset.a+el.dataset.b', $data );
 	}
 
 	public function test__main_js_is_not_printed_when_comments_are_closed(): void {
@@ -84,7 +110,7 @@ class Comment_Blocker__Test extends TestCase {
 		$this->assertSame( '', $html );
 	}
 
-	public function test__main_js_contains_configured_selector_and_unique_code(): void {
+	public function test__main_js_uses_configured_selector_unique_code_field_name_and_form_duration(): void {
 		WP_Mock::userFunction( 'is_singular' )->andReturn( true );
 		WP_Mock::userFunction( 'comments_open' )->andReturn( true );
 
@@ -94,8 +120,9 @@ class Comment_Blocker__Test extends TestCase {
 
 		$this->assertStringContainsString( "closest( '#send-comment' )", $html );
 		$this->assertStringContainsString( "(date.getUTCMonth() + 1) + 'test-code'", $html );
-		$this->assertStringContainsString( "input.name = 'spamblock_code'", $html );
-		$this->assertStringContainsString( 'sbmt.form.querySelector', $html );
+		$this->assertMatchesRegularExpression( "/\\.name = 'spamblock_code';/", $html );
+		$this->assertMatchesRegularExpression( "/\\.name = 'spamblock_code_time';/", $html );
+		$this->assertStringContainsString( 'performance.now() - formStart', $html );
 	}
 
 	public function test__regular_comment_with_previous_field_name_is_allowed(): void {
@@ -104,9 +131,22 @@ class Comment_Blocker__Test extends TestCase {
 			'spamblock_code:' . time(),
 		];
 		$_POST['old_spamblock_code'] = gmdate( 'jn' ) . 'test-code';
+		$_POST['old_spamblock_code_time'] = '3';
 
 		$this->blocker()->block_spam( [ 'comment_type' => 'comment' ] );
 
+		$this->assertTrue( true );
+	}
+
+	public function test__regular_comment_is_blocked_when_submitted_too_soon(): void {
+		$_POST['spamblock_code'] = gmdate( 'jn' ) . 'test-code';
+		$_POST['spamblock_code_time'] = '2';
+
+		WP_Mock::userFunction( 'wp_die' )
+			->once()
+			->with( \Mockery::type( 'string' ), 'Spam Blocked', [ 'response' => 403 ] );
+
+		$this->blocker()->block_spam( [ 'comment_type' => 'comment' ] );
 		$this->assertTrue( true );
 	}
 
@@ -119,7 +159,7 @@ class Comment_Blocker__Test extends TestCase {
 				'kama_spamblock__nonce_field_names',
 				\Mockery::on( static function ( array $field_names ): bool {
 					return 1 === count( $field_names )
-						&& 1 === preg_match( '/^[a-f][a-f0-9]*:[0-9]+$/', $field_names[0] );
+						&& 1 === preg_match( '/^[a-z][a-f0-9]{10,20}:[0-9]+$/', $field_names[0] );
 				} )
 			)
 			->andReturn( true );
@@ -145,7 +185,7 @@ class Comment_Blocker__Test extends TestCase {
 				\Mockery::on( static function ( array $saved ): bool {
 					return 10 === count( $saved )
 						&& 0 === strpos( $saved[0], 'field2:' )
-						&& 1 === preg_match( '/^[a-f][a-f0-9]*:[0-9]+$/', $saved[9] );
+						&& 1 === preg_match( '/^[a-z][a-f0-9]{10,20}:[0-9]+$/', $saved[9] );
 				} )
 			)
 			->andReturn( true );
@@ -162,4 +202,5 @@ class Comment_Blocker__Test extends TestCase {
 
 		return $blocker;
 	}
+
 }

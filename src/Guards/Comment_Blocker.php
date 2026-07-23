@@ -10,6 +10,8 @@ class Comment_Blocker {
 	private const TOKEN_NAMES_LIMIT  = 10;
 	private const TOKEN_NAME_TTL     = 4 * HOUR_IN_SECONDS;
 
+	private const MIN_FILL_DURATION_SEC = 3;
+
 	/** @var string[] `comment` for WP 5.5+ */
 	private array $comment_types = [ '', 'comment' ];
 
@@ -27,7 +29,7 @@ class Comment_Blocker {
 
 	public function __construct( Options $options ) {
 		$this->options = $options;
-		$this->token = self::make_hash( gmdate( 'jn' ) . $options->unique_code );
+		$this->token = self::ensure_hash( gmdate( 'jn' ) . $options->unique_code );
 	}
 
 	public function init(): void {
@@ -48,18 +50,31 @@ class Comment_Blocker {
 		}
 
 		$token = '';
+		$passed_sec = 0;
 		foreach( $this->token_names as $field_name ){
 			$token = (string) ( $_POST[ $field_name ] ?? '' );
 			if( $token ){
 				$token = trim( wp_unslash( $token ) );
+				$passed_sec = (int) ( $_POST[ $this->get_time_field_name( $field_name ) ] ?? 0 );
 				break;
 			}
 		}
 
-		if( self::make_hash( $token ) !== $this->token ){
+		if(
+			( $passed_sec < self::MIN_FILL_DURATION_SEC )
+			||
+			( self::ensure_hash( $token ) !== $this->token )
+		){
 			/** @noinspection ForgottenDebugOutputInspection */
 			wp_die( $this->block_form(), 'Spam Blocked', [ 'response' => 403 ] );
 		}
+	}
+
+	/**
+	 * Creates hash from specified token code (if it's not hashed yet).
+	 */
+	private static function ensure_hash( string $token ): string {
+		return preg_match( '/^[a-f0-9]{32}$/', $token ) ? $token : md5( $token );
 	}
 
 	/**
@@ -67,37 +82,37 @@ class Comment_Blocker {
 	 */
 	private function block_form(): string {
 		ob_start();
-		$field_name = esc_html( $this->token_name );
+		$token_flname = esc_html( $this->token_name );
+		$time_flname = esc_html( $this->get_time_field_name( $this->token_name ) );
 		?>
 		<h1><?= __( 'Antispam block your comment!', 'kama-spamblock' ) ?></h1>
 
 		<style>
 			.kama-spamblock-form { max-width:45rem; margin: auto; }
 			.kama-spamblock-form textarea { display:none; }
-			.kama-spamblock-form textarea[name="<?= $field_name ?>"] { display:block; width:100%; height:3em; box-sizing:border-box; margin:1.5em 0; }
+			.kama-spamblock-form textarea[name="<?= $token_flname ?>"] { display:block; width:100%; height:3em; box-sizing:border-box; margin:1.5em 0; }
 			.kama-spamblock-form button { height:70px; width:100%; font-size:150%; cursor:pointer; border:none; color:#fff; background:#555; }
-			.kama-spamblock-form <?= $field_name ?> { padding:.2em .3em; background:rgba(0 0 0 / .1); }
+			.kama-spamblock-form <?= $token_flname ?> { padding:.2em .3em; background:rgba(0 0 0 / .1); }
 		</style>
 
 		<form class="kama-spamblock-form" method="POST" action="<?= site_url( '/wp-comments-post.php' ) ?>">
 			<p>
 				<?= strtr(
 					__( 'Replace the value in the field below with {CODE} and click the button.', 'kama-spamblock' ), [
-					'{CODE}' => "<$field_name>" . esc_html( $this->token ) . "</$field_name>"
+					'{CODE}' => $this->render_challenge_html( wp_rand( 1, 3 ) )
 				] ) ?>
 			</p>
 
 			<?php
 			// we set value here just to the field has any value to make similar to other fields (this val never used)
 			$fields = [
-				sprintf( '<textarea name="%s">%s</textarea>', $field_name, esc_textarea( (string) ( $_POST['comment_post_ID'] ?? '' ) ) )
+				sprintf( '<textarea name="%s">%s</textarea>', $token_flname, esc_textarea( (string) ( $_POST['comment_post_ID'] ?? '' ) ) ),
+				sprintf( '<textarea name="%s">0</textarea>', $time_flname )
 			];
 			foreach( $_POST as $key => $val ){
-				if( $key === $field_name || ! is_string( $val ) ){
-					continue;
+				if( $key !== $token_flname && $key !== $time_flname && is_string( $val ) ){
+					$fields[] = sprintf( '<textarea name="%s">%s</textarea>', esc_attr( $key ), esc_textarea( wp_unslash( $val ) ) );
 				}
-
-				$fields[] = sprintf( '<textarea name="%s">%s</textarea>', esc_attr( $key ), esc_textarea( wp_unslash( $val ) ) );
 			}
 
 			shuffle( $fields );
@@ -106,10 +121,42 @@ class Comment_Blocker {
 			?>
 
 			<button type="button"><?= __( 'Send comment again', 'kama-spamblock' ) ?></button>
-			<script>document.currentScript.previousElementSibling.addEventListener( 'click', ev => ev.currentTarget.form.requestSubmit() )</script>
+			<script>
+				{
+					let button = document.currentScript.previousElementSibling;
+					let formStart = performance.now();
+					button.addEventListener( 'click', ev => {
+						let form = ev.currentTarget.form;
+						form.elements['<?= $time_flname ?>'].value = '' + Math.floor( ( performance.now() - formStart ) / 1000 );
+						form.requestSubmit();
+					} );
+				}
+			</script>
 		</form>
 		<?php
 		return ob_get_clean();
+	}
+
+	private function render_challenge_html( int $variant ): string {
+		$tag = esc_html( $this->token_name );
+		$parts = str_split( $this->token, 11 );
+
+		switch( $variant ){
+			case 1:
+				return "<$tag><$tag-a>$parts[0]</$tag-a><$tag-b>$parts[1]</$tag-b><$tag-c>$parts[2]</$tag-c></$tag>";
+			case 2:
+				return sprintf(
+					'<%1$s data-a="%2$s" data-b="%3$s" data-c="%4$s"></%1$s>'
+					. '<script>(el=>el.textContent=el.dataset.c+el.dataset.a+el.dataset.b)(document.currentScript.previousElementSibling)</script>',
+					$tag,
+					esc_attr( $parts[1] ),
+					esc_attr( $parts[2] ),
+					esc_attr( $parts[0] )
+				);
+			case 3:
+			default:
+				return "<$tag>" . esc_html( $this->token ) . "</$tag>";
+		}
 	}
 
 	public function print_main_js(): void {
@@ -121,8 +168,9 @@ class Comment_Blocker {
 		}
 
 		$selector = '#' . esc_html( sanitize_html_class( $this->options->sibmit_button_id ) );
-		$uniqcode = esc_html( Options::sanitize_uniue_code( $this->options->unique_code ) );
-		$filedkey = esc_html( $this->token_name );
+		$uniq_code = esc_html( Options::sanitize_uniue_code( $this->options->unique_code ) );
+		$token_flname = esc_html( $this->token_name );
+		$time_flname = esc_html( $this->get_time_field_name( $this->token_name ) );
 
 		echo <<<HTML
 		<script id="kama_spamblock">
@@ -130,6 +178,7 @@ class Comment_Blocker {
 				document.addEventListener( 'mousedown', handleSubmit );
 				document.addEventListener( 'touchstart', handleSubmit );
 				document.addEventListener( 'keypress', handleSubmit );
+				let formStart = performance.now();
 
 				function handleSubmit( ev ){
 					let sbmt = ev.target.closest( '$selector' );
@@ -138,12 +187,17 @@ class Comment_Blocker {
 					}
 
 					let date = new Date();
-					let $filedkey = document.createElement( 'input' );
-					$filedkey.value = '' + date.getUTCDate() + (date.getUTCMonth() + 1) + '$uniqcode';
-					$filedkey.name = '$filedkey';
-					$filedkey.type = 'hidden';
+					let $token_flname = document.createElement( 'input' );
+					$token_flname.type = 'hidden';
+					$token_flname.name = '$token_flname';
+					$token_flname.value = '' + date.getUTCDate() + (date.getUTCMonth() + 1) + '$uniq_code';
+					sbmt.before( $token_flname );
 
-					sbmt.before( $filedkey );
+					let dur = document.createElement( 'input' );
+					dur.type = 'hidden';
+					dur.name = '$time_flname';
+					dur.value = '' + Math.floor( ( performance.now() - formStart ) / 1000 );
+					sbmt.before( dur );
 				}
 			} );
 		</script>
@@ -200,11 +254,8 @@ class Comment_Blocker {
 		return $char . substr( md5( wp_generate_uuid4() ), 0, wp_rand( 10, 20 ) );
 	}
 
-	/**
-	 * Creates hash from specified token code (if it's not hashed yet).
-	 */
-	private static function make_hash( string $token ): string {
-		return preg_match( '/^[a-f0-9]{32}$/', $token ) ? $token : md5( $token );
+	private function get_time_field_name( string $token_name ): string {
+		return $token_name . '_time';
 	}
 
 }
