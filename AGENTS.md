@@ -7,6 +7,7 @@ Kama SpamBlock is a WordPress plugin that blocks basic automated comment spam.
 - Support PHP 7.4 and later.
 - Follow the existing WordPress-oriented PHP style in the project.
 - Install development dependencies with `make composer.install`.
+- Prefer minimal, readable code. Do not add defensive branches, abstractions, or future-proofing for hypothetical cases; add complexity only for a concrete requirement or demonstrated problem.
 
 ## Tests
 
