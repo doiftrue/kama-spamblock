@@ -26,6 +26,17 @@ class Trackback_Blocker {
 			return;
 		}
 
+		$status = (int) wp_remote_retrieve_response_code( $response );
+		$content_type = (string) wp_remote_retrieve_header( $response, 'content-type' );
+		$is_binary = preg_match(
+			'~^(?:image|audio|video|font)/|^application/(?:octet-stream|pdf|zip|gzip|x-(?:7z-compressed|rar-compressed))(?:;|$)~i',
+			$content_type
+		);
+		if( $status < 200 || $status >= 300 || $is_binary ){
+			$this->block_no_backlink();
+			return;
+		}
+
 		$external_html = wp_remote_retrieve_body( $response );
 
 		if( ! $this->has_backlink( $external_html ) ){

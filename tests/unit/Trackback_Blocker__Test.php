@@ -18,7 +18,11 @@ class Trackback_Blocker__Test extends TestCase {
 				'redirection'         => 2,
 				'limit_response_size' => 1024 * 1024,
 			] )
-			->andReturn( [ 'body' => '<a href="https://example.test/article">Source</a>' ] );
+			->andReturn( [
+				'response' => [ 'code' => 200 ],
+				'headers'  => [],
+				'body'     => '<a href="https://example.test/article">Source</a>',
+			] );
 		WP_Mock::userFunction( 'home_url' )->andReturn( 'https://example.test' );
 
 		$this->blocker()->block_spam( [
@@ -31,8 +35,48 @@ class Trackback_Blocker__Test extends TestCase {
 
 	public function test__trackback_without_backlink_is_blocked(): void {
 		WP_Mock::userFunction( 'wp_safe_remote_get' )
-			->andReturn( [ 'body' => '<p>No link here</p>' ] );
+			->andReturn( [
+				'response' => [ 'code' => 200 ],
+				'headers'  => [ 'content-type' => 'text/html; charset=UTF-8' ],
+				'body'     => '<p>No link here</p>',
+			] );
 		WP_Mock::userFunction( 'home_url' )->andReturn( 'https://example.test' );
+		WP_Mock::userFunction( 'wp_die' )
+			->once()
+			->with( 'No backlink.', 'Spam Blocked', [ 'response' => 403 ] );
+
+		$this->blocker()->block_spam( [
+			'comment_type'       => 'trackback',
+			'comment_author_url' => 'https://source.test/post',
+		] );
+		$this->assertTrue( true );
+	}
+
+	public function test__trackback_with_backlink_in_error_response_is_blocked(): void {
+		WP_Mock::userFunction( 'wp_safe_remote_get' )
+			->andReturn( [
+				'response' => [ 'code' => 404 ],
+				'headers'  => [ 'content-type' => 'text/html' ],
+				'body'     => '<a href="https://example.test/article">Source</a>',
+			] );
+		WP_Mock::userFunction( 'wp_die' )
+			->once()
+			->with( 'No backlink.', 'Spam Blocked', [ 'response' => 403 ] );
+
+		$this->blocker()->block_spam( [
+			'comment_type'       => 'trackback',
+			'comment_author_url' => 'https://source.test/post',
+		] );
+		$this->assertTrue( true );
+	}
+
+	public function test__trackback_with_backlink_in_binary_response_is_blocked(): void {
+		WP_Mock::userFunction( 'wp_safe_remote_get' )
+			->andReturn( [
+				'response' => [ 'code' => 200 ],
+				'headers'  => [ 'content-type' => 'application/pdf' ],
+				'body'     => '<a href="https://example.test/article">Source</a>',
+			] );
 		WP_Mock::userFunction( 'wp_die' )
 			->once()
 			->with( 'No backlink.', 'Spam Blocked', [ 'response' => 403 ] );
