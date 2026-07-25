@@ -24,8 +24,8 @@ Even if you are using an external comment system like Disqus, Kama Spamblock can
 
 Kama Spamblock combines several small checks that are inexpensive for the site and invisible during normal commenting:
 
-* The protective field name rotates while recent names remain valid for pages served from full-page cache.
-* Each marker is tied to the current UTC date and the specific WordPress post.
+* The protective field name and its unique code rotate together every four hours. Ten recent pairs remain valid for pages served from full-page cache.
+* Each marker is tied to the specific WordPress post, so a marker copied from another comment form is rejected.
 * The form must remain open for at least three seconds before it can be accepted.
 * Protective fields are added only after interaction with the comment submit button.
 * If a valid comment is blocked, a JavaScript-only retry form preserves the entered data.
@@ -63,6 +63,10 @@ No! The plugin is invisible to users. You should navigate to the 'Discussion' se
 
 
 == Changelog ==
+
+= 2.0.0 =
+* NEW: Rotate protective field names and unique codes together every four hours while keeping ten recent pairs valid for cached pages.
+* IMP: Remove the static unique code setting and UTC date from comment markers.
 
 = 1.9.0 =
 * IMP: Return a 403 response for blocked spam comments.

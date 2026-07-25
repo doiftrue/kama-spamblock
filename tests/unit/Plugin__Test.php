@@ -43,7 +43,6 @@ class Plugin__Test extends TestCase {
 		$this->original_filters = $GLOBALS['kama_spamblock_test_filters'] ?? null;
 		$GLOBALS['stub_wp_options']->ks_options = [
 			'sibmit_button_id' => 'submit',
-			'unique_code'      => 'test-code',
 		];
 		$GLOBALS['kama_spamblock_test_actions'] = [];
 		$GLOBALS['kama_spamblock_test_filters'] = [];

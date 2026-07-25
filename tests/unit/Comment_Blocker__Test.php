@@ -22,9 +22,10 @@ class Comment_Blocker__Test extends TestCase {
 		$this->original_post = $_POST;
 		$GLOBALS['stub_wp_options']->ks_options = [
 			'sibmit_button_id' => 'send-comment',
-			'unique_code'      => 'test-code',
 		];
-		$GLOBALS['stub_wp_options']->kama_spamblock__nonce_field_names = [ 'spamblock_code:' . time() ];
+		$GLOBALS['stub_wp_options']->kama_spamblock__tokens_data = [
+			'spamblock_code:test-code:' . time(),
+		];
 		$_POST = [];
 	}
 
@@ -56,7 +57,6 @@ class Comment_Blocker__Test extends TestCase {
 		$_POST = [ 'comment' => 'Keep me', 'comment_post_ID' => '123', 'spamblock_code' => 'invalid' ];
 
 		WP_Mock::userFunction( 'wp_die' )
-			->once()
 			->with(
 				\Mockery::on( static function ( string $html ): bool {
 					return false !== strpos( $html, 'Antispam block your comment!' )
@@ -110,7 +110,7 @@ class Comment_Blocker__Test extends TestCase {
 		$this->assertSame( '', $html );
 	}
 
-	public function test__main_js_uses_configured_selector_unique_code_field_name_and_form_duration(): void {
+	public function test__main_js_uses_current_token_record_and_form_duration(): void {
 		WP_Mock::userFunction( 'is_singular' )->andReturn( true );
 		WP_Mock::userFunction( 'comments_open' )->andReturn( true );
 
@@ -119,21 +119,36 @@ class Comment_Blocker__Test extends TestCase {
 		$html = (string) ob_get_clean();
 
 		$this->assertStringContainsString( "closest( '#send-comment' )", $html );
-		$this->assertStringContainsString( 'date.getUTCFullYear()', $html );
 		$this->assertStringContainsString( "form.elements['comment_post_ID'].value", $html );
-		$this->assertStringContainsString( "utcDate + '|' + postId + '|test-code'", $html );
+		$this->assertMatchesRegularExpression( "/\\+\\s*['\"]\\|test-code['\"]/", $html );
+		$this->assertStringNotContainsString( 'getUTC', $html );
 		$this->assertMatchesRegularExpression( "/\\.name = 'spamblock_code';/", $html );
 		$this->assertMatchesRegularExpression( "/\\.name = 'spamblock_code_time';/", $html );
 		$this->assertStringContainsString( 'performance.now() - formStart', $html );
 	}
 
 	public function test__regular_comment_with_previous_field_name_is_allowed(): void {
-		$GLOBALS['stub_wp_options']->kama_spamblock__nonce_field_names = [
-			'old_spamblock_code:' . ( time() - 14400 ),
-			'spamblock_code:' . time(),
+		$GLOBALS['stub_wp_options']->kama_spamblock__tokens_data = [
+			'old_spamblock_code:old-code:' . ( time() - 14400 ),
+			'spamblock_code:test-code:' . time(),
 		];
-		$_POST['old_spamblock_code'] = $this->plain_token( 123 );
+		$_POST['old_spamblock_code'] = $this->plain_token( 123, 'old-code' );
 		$_POST['old_spamblock_code_time'] = '3';
+
+		$this->blocker()->block_spam( [ 'comment_type' => 'comment', 'comment_post_ID' => 123 ] );
+
+		$this->assertTrue( true );
+	}
+
+	public function test__regular_comment_is_allowed_when_any_submitted_record_is_valid(): void {
+		$GLOBALS['stub_wp_options']->kama_spamblock__tokens_data = [
+			'old_spamblock_code:old-code:' . ( time() - 14400 ),
+			'spamblock_code:test-code:' . time(),
+		];
+		$_POST['old_spamblock_code'] = 'invalid';
+		$_POST['old_spamblock_code_time'] = '3';
+		$_POST['spamblock_code'] = $this->plain_token( 123 );
+		$_POST['spamblock_code_time'] = '3';
 
 		$this->blocker()->block_spam( [ 'comment_type' => 'comment', 'comment_post_ID' => 123 ] );
 
@@ -164,33 +179,32 @@ class Comment_Blocker__Test extends TestCase {
 		$this->assertTrue( true );
 	}
 
-	public function test__regular_comment_with_token_for_another_date_is_blocked(): void {
-		$previous_day = gmdate( 'Y-m-d', time() - DAY_IN_SECONDS );
-		$previous_year = ( (int) gmdate( 'Y' ) - 1 ) . gmdate( '-m-d' );
+	public function test__regular_comment_cannot_mix_field_name_and_code_from_different_records(): void {
+		$GLOBALS['stub_wp_options']->kama_spamblock__tokens_data = [
+			'old_spamblock_code:old-code:' . ( time() - 14400 ),
+			'spamblock_code:test-code:' . time(),
+		];
+		$_POST['spamblock_code'] = $this->plain_token( 123, 'old-code' );
 		$_POST['spamblock_code_time'] = '3';
 
 		WP_Mock::userFunction( 'wp_die' )
-			->twice()
+			->once()
 			->with( \Mockery::type( 'string' ), 'Spam Blocked', [ 'response' => 403 ] );
 
-		foreach( [ $previous_day, $previous_year ] as $date ){
-			$_POST['spamblock_code'] = $this->plain_token( 123, $date );
-			$this->blocker()->block_spam( [ 'comment_type' => 'comment', 'comment_post_ID' => 123 ] );
-		}
-
+		$this->blocker()->block_spam( [ 'comment_type' => 'comment', 'comment_post_ID' => 123 ] );
 		$this->assertTrue( true );
 	}
 
-	public function test__init_creates_a_field_name_when_history_is_empty(): void {
-		unset( $GLOBALS['stub_wp_options']->kama_spamblock__nonce_field_names );
+	public function test__init_creates_token_record_when_history_is_empty(): void {
+		unset( $GLOBALS['stub_wp_options']->kama_spamblock__tokens_data );
 		WP_Mock::userFunction( 'wp_generate_uuid4' )->once()->andReturn( 'field-name' );
 		WP_Mock::userFunction( 'update_option' )
 			->once()
 			->with(
-				'kama_spamblock__nonce_field_names',
-				\Mockery::on( static function ( array $field_names ): bool {
-					return 1 === count( $field_names )
-						&& 1 === preg_match( '/^[a-z][a-f0-9]{10,20}:[0-9]+$/', $field_names[0] );
+				'kama_spamblock__tokens_data',
+				\Mockery::on( static function ( array $records ): bool {
+					return 1 === count( $records )
+						&& 1 === preg_match( '/^[a-z][a-f0-9]{10,20}:[A-Za-z0-9]{10}:[0-9]+$/', $records[0] );
 				} )
 			)
 			->andReturn( true );
@@ -201,22 +215,22 @@ class Comment_Blocker__Test extends TestCase {
 		$this->assertTrue( true );
 	}
 
-	public function test__init_rotates_expired_name_and_keeps_ten_latest_entries(): void {
-		$field_names = [];
+	public function test__init_rotates_expired_record_and_keeps_ten_latest_entries(): void {
+		$records = [];
 		for( $i = 1; $i <= 10; $i++ ){
-			$field_names[] = "field$i:" . ( time() - 14400 );
+			$records[] = "field$i:code$i:" . ( time() - 14400 );
 		}
-		$GLOBALS['stub_wp_options']->kama_spamblock__nonce_field_names = $field_names;
+		$GLOBALS['stub_wp_options']->kama_spamblock__tokens_data = $records;
 
 		WP_Mock::userFunction( 'wp_generate_uuid4' )->once()->andReturn( 'another-field-name' );
 		WP_Mock::userFunction( 'update_option' )
 			->once()
 			->with(
-				'kama_spamblock__nonce_field_names',
+				'kama_spamblock__tokens_data',
 				\Mockery::on( static function ( array $saved ): bool {
 					return 10 === count( $saved )
-						&& 0 === strpos( $saved[0], 'field2:' )
-						&& 1 === preg_match( '/^[a-z][a-f0-9]{10,20}:[0-9]+$/', $saved[9] );
+						&& 0 === strpos( $saved[0], 'field2:code2:' )
+						&& 1 === preg_match( '/^[a-z][a-f0-9]{10,20}:[A-Za-z0-9]{10}:[0-9]+$/', $saved[9] );
 				} )
 			)
 			->andReturn( true );
@@ -234,8 +248,8 @@ class Comment_Blocker__Test extends TestCase {
 		return $blocker;
 	}
 
-	private function plain_token( int $post_id, ?string $date = null ): string {
-		return ( $date ?? gmdate( 'Y-m-d' ) ) . "|$post_id|test-code";
+	private function plain_token( int $post_id, string $code = 'test-code' ): string {
+		return "$post_id|$code";
 	}
 
 }

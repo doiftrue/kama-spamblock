@@ -6,9 +6,9 @@ use Kama_Spamblock\Options;
 
 class Comment_Blocker {
 
-	private const TOKEN_NAMES_OPTION = 'kama_spamblock__nonce_field_names';
-	private const TOKEN_NAMES_LIMIT  = 10;
-	private const TOKEN_NAME_TTL     = 4 * HOUR_IN_SECONDS;
+	private const TOKENS_DATA_OPT   = 'kama_spamblock__tokens_data';
+	private const TOKENS_DATA_LIMIT = 10;
+	private const TOKEN_TTL         = 4 * HOUR_IN_SECONDS;
 
 	private const MIN_FILL_DURATION_SEC = 3;
 
@@ -17,20 +17,23 @@ class Comment_Blocker {
 
 	private Options $options;
 
-	/** Current using token name for field. */
+	/** Current token name (for field). */
 	private string $token_name;
 
-	/** @var string[] All available token names for fields (prev generated names to handle page cache). */
-	private array $token_names;
+	/** Current token (code). Main part of the token. */
+	private string $token_code;
 
+	/** @var string[] Token codes keyed by field name (previous records are kept to handle page cache). */
+	private array $tokens_data;
 
 	public function __construct( Options $options ) {
 		$this->options = $options;
 	}
 
 	public function init(): void {
-		$this->token_names = $this->get_token_names();
-		$this->token_name = end( $this->token_names );
+		$this->tokens_data = $this->get_tokens_data();
+		$this->token_name  = (string) array_key_last( $this->tokens_data );
+		$this->token_code  = $this->tokens_data[ $this->token_name ];
 	}
 
 	public function block_spam( array $commentdata ): void {
@@ -45,31 +48,36 @@ class Comment_Blocker {
 			return;
 		}
 
-		$token = '';
-		$passed_sec = 0;
-		foreach( $this->token_names as $field_name ){
-			$token = (string) ( $_POST[ $field_name ] ?? '' );
-			if( $token ){
-				$token = trim( wp_unslash( $token ) );
-				$passed_sec = (int) ( $_POST[ $this->get_time_field_name( $field_name ) ] ?? 0 );
+		$post_id = (int) ( $commentdata['comment_post_ID'] ?? 0 );
+
+		$is_valid_token = false;
+		foreach( $this->tokens_data as $field_name => $token_code ){
+			$post_token = trim( wp_unslash( (string) ( $_POST[ $field_name ] ?? '' ) ) );
+			if( ! $post_token ){
+				continue;
+			}
+
+			$post_duration_sec = (int) ( $_POST[ $this->get_time_field_name( $field_name ) ] ?? 0 );
+
+			if(
+				( $post_duration_sec >= self::MIN_FILL_DURATION_SEC )
+				&&
+				( self::ensure_hash( $post_token ) === $this->make_hashed_token( $post_id, $token_code ) )
+			){
+				$is_valid_token = true;
 				break;
 			}
 		}
 
-		$expected_token = $this->make_token( (int) ( $commentdata['comment_post_ID'] ?? 0 ) );
-
-		if(
-			( $passed_sec < self::MIN_FILL_DURATION_SEC )
-			||
-			( self::ensure_hash( $token ) !== $expected_token )
-		){
+		if( ! $is_valid_token ){
+			$form_html = $this->block_form( $this->make_hashed_token( $post_id, $this->token_code ) );
 			/** @noinspection ForgottenDebugOutputInspection */
-			wp_die( $this->block_form( $expected_token ), 'Spam Blocked', [ 'response' => 403 ] );
+			wp_die( $form_html, 'Spam Blocked', [ 'response' => 403 ] );
 		}
 	}
 
-	private function make_token( int $post_id ): string {
-		return self::ensure_hash( gmdate( 'Y-m-d' ) . "|$post_id|" . $this->options->unique_code );
+	private function make_hashed_token( int $post_id, string $token_code ): string {
+		return self::ensure_hash( "$post_id|$token_code" );
 	}
 
 	/**
@@ -82,9 +90,9 @@ class Comment_Blocker {
 	/**
 	 * Gets Form HTML for blocked comment.
 	 */
-	private function block_form( string $token ): string {
+	private function block_form( string $hashed_token ): string {
 		ob_start();
-		$token_flname = esc_html( $this->token_name );
+		$token_name = esc_html( $this->token_name );
 		$time_flname = esc_html( $this->get_time_field_name( $this->token_name ) );
 		?>
 		<h1><?= __( 'Antispam block your comment!', 'kama-spamblock' ) ?></h1>
@@ -92,27 +100,27 @@ class Comment_Blocker {
 		<style>
 			.kama-spamblock-form { max-width:45rem; margin: auto; }
 			.kama-spamblock-form textarea { display:none; }
-			.kama-spamblock-form textarea[name="<?= $token_flname ?>"] { display:block; width:100%; height:3em; box-sizing:border-box; margin:1.5em 0; }
+			.kama-spamblock-form textarea[name="<?= $token_name ?>"] { display:block; width:100%; height:3em; box-sizing:border-box; margin:1.5em 0; }
 			.kama-spamblock-form button { height:70px; width:100%; font-size:150%; cursor:pointer; border:none; color:#fff; background:#555; }
-			.kama-spamblock-form <?= $token_flname ?> { padding:.2em .3em; background:rgba(0 0 0 / .1); }
+			.kama-spamblock-form <?= $token_name ?> { padding:.2em .3em; background:rgba(0 0 0 / .1); }
 		</style>
 
 		<form class="kama-spamblock-form" method="POST" action="<?= site_url( '/wp-comments-post.php' ) ?>">
 			<p>
 				<?= strtr(
 					__( 'Replace the value in the field below with {CODE} and click the button.', 'kama-spamblock' ), [
-					'{CODE}' => $this->render_challenge_html( $token, wp_rand( 1, 3 ) )
+					'{CODE}' => $this->render_challenge_html( $hashed_token, wp_rand( 1, 3 ) )
 				] ) ?>
 			</p>
 
 			<?php
 			// we set value here just to the field has any value to make similar to other fields (this val never used)
 			$fields = [
-				sprintf( '<textarea name="%s">%s</textarea>', $token_flname, esc_textarea( (string) ( $_POST['comment_post_ID'] ?? '' ) ) ),
+				sprintf( '<textarea name="%s">%s</textarea>', $token_name, esc_textarea( (string) ( $_POST['comment_post_ID'] ?? '' ) ) ),
 				sprintf( '<textarea name="%s">0</textarea>', $time_flname )
 			];
 			foreach( $_POST as $key => $val ){
-				if( $key !== $token_flname && $key !== $time_flname && is_string( $val ) ){
+				if( $key !== $token_name && $key !== $time_flname && is_string( $val ) ){
 					$fields[] = sprintf( '<textarea name="%s">%s</textarea>', esc_attr( $key ), esc_textarea( wp_unslash( $val ) ) );
 				}
 			}
@@ -170,9 +178,10 @@ class Comment_Blocker {
 		}
 
 		$selector = '#' . esc_html( sanitize_html_class( $this->options->sibmit_button_id ) );
-		$uniq_code = esc_html( Options::sanitize_uniue_code( $this->options->unique_code ) );
-		$token_flname = esc_html( $this->token_name );
+		$token_code = esc_html( $this->token_code );
+		$token_name = esc_html( $this->token_name );
 		$time_flname = esc_html( $this->get_time_field_name( $this->token_name ) );
+		$var_name = substr( uniqid( chr( wp_rand( 97, 122 ) ), false ), 0, 5 );
 
 		echo <<<HTML
 		<script id="kama_spamblock">
@@ -188,20 +197,17 @@ class Comment_Blocker {
 						return;
 					}
 
-					let date = new Date();
-					let utcDate = date.getUTCFullYear() + '-' + ( '0' + ( date.getUTCMonth() + 1 ) ).slice( -2 ) + '-' + ( '0' + date.getUTCDate() ).slice( -2 );
-					let postId = sbmt.form.elements['comment_post_ID'].value;
-					let $token_flname = document.createElement( 'input' );
-					$token_flname.type = 'hidden';
-					$token_flname.name = '$token_flname';
-					$token_flname.value = utcDate + '|' + postId + '|$uniq_code';
-					sbmt.before( $token_flname );
+					let $var_name = document.createElement( 'input' );
+					$var_name.type = 'hidden';
+					$var_name.name = '$token_name';
+					$var_name.value = sbmt.form.elements['comment_post_ID'].value + '|$token_code';
+					sbmt.before( $var_name );
 
-					let dur = document.createElement( 'input' );
-					dur.type = 'hidden';
-					dur.name = '$time_flname';
-					dur.value = '' + Math.floor( ( performance.now() - formStart ) / 1000 );
-					sbmt.before( dur );
+					$var_name = document.createElement( 'input' );
+					$var_name.type = 'hidden';
+					$var_name.name = '$time_flname';
+					$var_name.value = '' + Math.floor( ( performance.now() - formStart ) / 1000 );
+					sbmt.before( $var_name );
 				}
 			} );
 		</script>
@@ -209,53 +215,59 @@ class Comment_Blocker {
 	}
 
 	/**
-	 * Gets active token field names and rotates the current name every four hours.
+	 * Gets active token records and rotates the current record every four hours.
 	 *
-	 * Stored option items use the `<name>:<created_at>` format.
+	 * Stored option items use the `<field_name>:<token_code>:<created_at>` format.
 	 *
-	 * @return string[]
+	 * @return array<string,string> Token codes keyed by field name.
 	 */
-	private function get_token_names(): array {
-		$names_data = (array) get_option( self::TOKEN_NAMES_OPTION, [] );
+	private function get_tokens_data(): array {
+		$data = (array) get_option( self::TOKENS_DATA_OPT, [] );
 
-		$last_item = (string) end( $names_data );
-		[ $field_name, $created_at ] = $this->parse_token_name( $last_item );
+		$last_item = (string) end( $data );
+		[ $field_name, $token_code, $created_at ] = $this->parse_token_info( $last_item );
 
-		$is_add_new = ! $field_name || ( ( time() - $created_at ) >= self::TOKEN_NAME_TTL );
+		$is_add_new = ! $field_name || ! $token_code || ( ( time() - $created_at ) >= self::TOKEN_TTL );
 		if( $is_add_new ){
-			$names_data[] = $this->create_token_name() . ':' . time();
-			$names_data = array_slice( $names_data, - self::TOKEN_NAMES_LIMIT );
-			update_option( self::TOKEN_NAMES_OPTION, $names_data );
+			$data[] = $this->generate_token_info();
+			$data = array_slice( $data, - self::TOKENS_DATA_LIMIT );
+			update_option( self::TOKENS_DATA_OPT, $data );
 		}
 
-		return $this->parse_token_names( $names_data );
+		return $this->parse_tokens_data( $data );
 	}
 
 	/**
-	 * Parses stored token entries and returns valid token field names.
+	 * Parses stored token records.
 	 *
-	 * @return string[]
+	 * @return array<string,string> Token codes keyed by field name.
 	 */
-	private function parse_token_names( array $names_data ): array {
-		$names = [];
-		foreach( $names_data as $name_data ){
-			[ $field_name ] = $this->parse_token_name( $name_data );
-			$field_name && ( $names[] = $field_name );
+	private function parse_tokens_data( array $tokens_data ): array {
+		$token_codes = [];
+		foreach( $tokens_data as $record ){
+			[ $field_name, $token_code, $created_at ] = $this->parse_token_info( $record );
+			if( $field_name && $token_code && $created_at ){
+				$token_codes[ $field_name ] = $token_code;
+			}
 		}
 
-		return $names;
+		return $token_codes;
 	}
 
-	private function parse_token_name( string $name_data ): array {
-		[ $field_name, $created_at ] = explode( ':', $name_data ) + [ '', 0 ];
+	/**
+	 * @param string $record Eg: 'field_name:token_code:1690000000'
+	 */
+	private function parse_token_info( string $record ): array {
+		[ $field_name, $token_code, $created_at ] = explode( ':', $record ) + [ '', '', 0 ];
 
-		return [ $field_name, (int) $created_at ];
+		return [ $field_name, $token_code, (int) $created_at ];
 	}
 
-	private function create_token_name(): string {
-		$char = chr( wp_rand( 97, 122 ) );
+	private function generate_token_info(): string {
+		$token_name = chr( wp_rand( 97, 122 ) ) . substr( md5( wp_generate_uuid4() ), 0, wp_rand( 10, 20 ) );
+		$token_code = wp_generate_password( 10, false );
 
-		return $char . substr( md5( wp_generate_uuid4() ), 0, wp_rand( 10, 20 ) );
+		return "$token_name:$token_code:" . time();
 	}
 
 	private function get_time_field_name( string $token_name ): string {
