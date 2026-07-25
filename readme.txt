@@ -65,8 +65,12 @@ No! The plugin is invisible to users. You should navigate to the 'Discussion' se
 == Changelog ==
 
 = 2.0.0 =
-* NEW: Rotate protective field names and unique codes together every four hours while keeping ten recent pairs valid for cached pages.
-* IMP: Remove the static unique code setting and UTC date from comment markers.
+* NEW: (better spamblock) Rotate protective field names and unique codes together every four hours while keeping ten recent pairs valid for cached pages.
+* NEW: (better spamblock) require at least three seconds before a comment can be submitted.
+* NEW: (better spamblock) Bind comment markers to the specific WordPress post.
+* NEW: Make the retry challenge harder for basic bots to parse by varying its HTML structure.
+* IMP: Reject pingbacks and trackbacks when the source page has a non-2xx response or binary content.
+* CHG: Remove the static unique code setting and UTC date from comment markers.
 
 = 1.9.0 =
 * IMP: Return a 403 response for blocked spam comments.

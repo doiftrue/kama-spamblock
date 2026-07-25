@@ -18,4 +18,3 @@ composer.install:
 	$(call php_run,, composer install)
 composer.update:
 	$(call php_run,, composer update)
-

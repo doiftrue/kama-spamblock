@@ -14,7 +14,7 @@
  * Requires PHP: 7.4
  * Requires at least: 5.7
  *
- * Version: 1.9.0
+ * Version: 2.0.0
  */
 
 namespace Kama_Spamblock;
